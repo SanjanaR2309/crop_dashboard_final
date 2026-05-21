@@ -1,0 +1,26 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+/backend/venv/
+
+# Node / JS
+node_modules/
+/dashboard-app/node_modules/
+dist/
+/dashboard-app/dist/
+.eslintcache
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
