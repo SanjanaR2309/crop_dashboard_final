@@ -3,10 +3,16 @@ FastAPI backend for Crop Knowledge Dashboard.
 Touches ONLY: crop_stage_knowledge, crop_stage_translations
 """
 import os
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+# Ensure local backend modules can be resolved on Vercel
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
 load_dotenv()
 
