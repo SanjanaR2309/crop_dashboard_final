@@ -199,7 +199,7 @@ async def _call_gemini(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(
                 _API_URL.format(model=model, api_key=api_key),
                 json=payload,
@@ -213,26 +213,43 @@ async def _call_gemini(
         logger.error("Gemini request failed: %s", e)
         return fallback.copy()
 
+    raw = ""
     try:
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        body = resp.json()
+        raw = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        # Strip markdown fences if Gemini added them despite responseMimeType
         if raw.startswith("```"):
-            raw = raw.split("```")[1]
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
             if raw.startswith("json"):
-                raw = raw[4:]
-        
-        # Apply the repair heuristic using the fallback keys
-        repaired = repair_gemini_json(raw, list(fallback.keys()))
-        data = json.loads(repaired, strict=False)
-    except (KeyError, IndexError, json.JSONDecodeError) as e:
-        logger.error("Failed to parse Gemini response: %s", e)
-        # Try raw fallback parsing as a safety net
+                raw = raw[4:].strip()
+
+        # ── Strategy 1: direct parse (works when Gemini returns clean JSON) ──
         try:
-            data = json.loads(raw, strict=False)
-        except Exception:
-            return fallback.copy()
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # ── Strategy 2: lenient parse (handles minor escaping issues) ──
+            try:
+                data = json.loads(raw, strict=False)
+            except json.JSONDecodeError:
+                # ── Strategy 3: repair heuristic as last resort ──
+                logger.warning("Direct JSON parse failed, attempting repair heuristic")
+                repaired = repair_gemini_json(raw, list(fallback.keys()))
+                data = json.loads(repaired, strict=False)
+
+    except (KeyError, IndexError) as e:
+        logger.error("Unexpected Gemini response structure: %s", e)
+        return fallback.copy()
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse Gemini response even after repair: %s | raw[:200]=%s", e, raw[:200])
+        return fallback.copy()
+    except Exception as e:
+        logger.error("Unexpected error parsing Gemini response: %s", e)
+        return fallback.copy()
 
     result = fallback.copy()
-    result.update({k: v or None for k, v in data.items() if k in result})
+    result.update({k: v if v else None for k, v in data.items() if k in result})
     return result
 
 
@@ -319,8 +336,51 @@ async def generate_crop_stages_template(
     model: str,
 ) -> list[dict]:
     """Generate a template list of growth phases and sub-stages for a new crop."""
+    if not api_key:
+        logger.warning("GEMINI_API_KEY not set — skipping stages template call")
+        return []
+
     prompt = _STAGES_TEMPLATE_PROMPT.format(crop_name=crop_name)
-    fallback = {"stages": []}
-    res = await _call_gemini(prompt, fallback, api_key, model, max_tokens=2048)
-    return res.get("stages", [])
+    payload = {
+        "system_instruction": {"parts": [{"text": _SYSTEM}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 2048,
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+        },
+    }
+
+    raw = ""
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                _API_URL.format(model=model, api_key=api_key),
+                json=payload,
+                headers={"content-type": "application/json"},
+            )
+            resp.raise_for_status()
+
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        # Strip markdown fences
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:].strip()
+
+        data = json.loads(raw)
+        stages = data.get("stages", [])
+        return stages if isinstance(stages, list) else []
+
+    except httpx.HTTPStatusError as e:
+        logger.error("Gemini stages API %s: %s", e.response.status_code, e.response.text[:300])
+        return []
+    except httpx.RequestError as e:
+        logger.error("Gemini stages request failed: %s", e)
+        return []
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        logger.error("Failed to parse stages template response: %s | raw[:200]=%s", e, raw[:200])
+        return []
 
