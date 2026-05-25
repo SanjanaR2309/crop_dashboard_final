@@ -27,31 +27,31 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return JSON with exactly these seven string keys:
+Return a valid JSON object with exactly 7 keys. IMPORTANT: keep every string value under 50 words. Be precise and concise.
 
 {{
-  "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
-  "pest_risk_factors":    "<comma-separated agronomic and climatic conditions that increase pest risk>",
-  "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
-  "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
-  "disease_risk_factors": "<comma-separated conditions that promote disease>",
-  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
+  "susceptible_pests":    "<comma-separated list, max 6 pests active at this sub-stage>",
+  "pest_risk_factors":    "<comma-separated list, max 5 agronomic and climatic risk factors>",
+  "pest_management":      "Cultural: <1 concise sentence, max 2 key practices>. Biological: <1 sentence, max 2 agents>. Chemical: <exact chemical name and concentration only>.",
+  "susceptible_diseases": "<comma-separated list, max 6 diseases active at this sub-stage>",
+  "disease_risk_factors": "<comma-separated list, max 5 risk factors>",
+  "disease_management":   "Cultural: <1 concise sentence, max 2 key practices>. Biological: <1 sentence, max 2 agents>. Chemical: <exact chemical name and concentration only>.",
   "env_conditions": {{
-    "uv_index":          "<e.g. Moderate to High (5-9)>",
-    "temp_max_c":        "<number, e.g. 35>",
-    "temp_min_c":        "<number, e.g. 20>",
-    "photoperiod":       "<e.g. 12-14 hours>",
-    "soil_temp_c":       "<range, e.g. 22-30>",
-    "irrigation_mm":     "<per-week range, e.g. 25-50>",
-    "optimal_temp_c":    "<range, e.g. 25-32>",
-    "avg_yield_kg_ha":   "<expected yield at this stage or 0 if pre-harvest, e.g. 0 or 4500>",
-    "rel_humidity_pct":  "<range, e.g. 60-80>",
-    "harvest_index_pct": "<0 to 100 depending on stage, e.g. 0 or 45>",
-    "soil_moisture_pct": "<description or range, e.g. Saturated to field capacity (25-35%)>"
+    "uv_index": "<e.g. Moderate (5-7)>",
+    "temp_max_c": "<°C>",
+    "temp_min_c": "<°C>",
+    "photoperiod": "<hours/day>",
+    "soil_temp_c": "<°C range>",
+    "irrigation_mm": "<mm/week>",
+    "optimal_temp_c": "<°C range>",
+    "avg_yield_kg_ha": "<kg/ha or 0>",
+    "rel_humidity_pct": "<%>",
+    "harvest_index_pct": "<% or 0>",
+    "soil_moisture_pct": "<% range>"
   }}
 }}
 
-Be specific to {crop_name} at this exact sub-stage. Use Indian crop-protection context.\
+Be specific to {crop_name} at this exact growth sub-stage. Indian agricultural context.\
 """
 
 _REGEN_FALLBACK = {
@@ -278,7 +278,7 @@ async def regenerate_stage(
         start_day=start_day,
         end_day=end_day,
     )
-    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=2048)
+    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=4096)
 
 
 async def translate_stage(
