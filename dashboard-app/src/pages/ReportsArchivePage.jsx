@@ -526,6 +526,12 @@ export default function ReportsArchivePage() {
                 {Object.values(groupedTree).sort((a, b) => a.crop_name.localeCompare(b.crop_name)).map(crop => {
                   const isCropExpanded = !!expandedCrops[crop.crop_name]
                   
+                  // Calculate dynamic verification stats for the crop
+                  const allCropStages = Object.values(crop.phases).flatMap(p => p.subStages)
+                  const cropTotalCount = allCropStages.length
+                  const cropVerifiedCount = allCropStages.filter(s => verifiedUids.includes(s.uid)).length
+                  const isCropFullyVerified = cropVerifiedCount === cropTotalCount && cropTotalCount > 0
+
                   return (
                     <div 
                       key={crop.crop_name} 
@@ -549,8 +555,17 @@ export default function ReportsArchivePage() {
                           <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--text-secondary)', transform: isCropExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
                             chevron_right
                           </span>
-                          <span style={{ fontSize: 18, fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 18, fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             🌾 {crop.crop_name}
+                            {isCropFullyVerified ? (
+                              <span style={{ fontSize: 11, color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, fontWeight: 800 }}>verified</span> Fully Verified
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 11, color: '#b45309', background: '#fffbeb', border: '1px solid #fef3c7', padding: '2px 8px', borderRadius: '100px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>hourglass_empty</span> {cropVerifiedCount}/{cropTotalCount} Verified
+                              </span>
+                            )}
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -588,6 +603,11 @@ export default function ReportsArchivePage() {
                             const phaseKey = `${crop.crop_name}|${phase.phase_name}`
                             const isPhaseExpanded = !!expandedPhases[phaseKey] // Closed by default
                             
+                            // Calculate dynamic verification stats for the sub-phase
+                            const phaseTotalCount = phase.subStages.length
+                            const phaseVerifiedCount = phase.subStages.filter(s => verifiedUids.includes(s.uid)).length
+                            const isPhaseFullyVerified = phaseVerifiedCount === phaseTotalCount && phaseTotalCount > 0
+
                             return (
                               <div key={phase.phase_name} style={{ margin: '8px 0', borderLeft: '2px solid var(--border)', paddingLeft: 16 }}>
                                 
@@ -609,8 +629,17 @@ export default function ReportsArchivePage() {
                                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--text-secondary)', transform: isPhaseExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
                                       chevron_right
                                     </span>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                       🌿 {phase.phase_name}
+                                      {isPhaseFullyVerified ? (
+                                        <span style={{ fontSize: 10, color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                          ✓ Verified
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: 10, color: '#b45309', background: '#fffbeb', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                                          {phaseVerifiedCount}/{phaseTotalCount} Verified
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                   <span style={{ fontSize: 11, background: '#e5e7eb', color: '#4b5563', padding: '2px 8px', borderRadius: '100px', fontWeight: 600 }}>
