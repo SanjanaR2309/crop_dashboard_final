@@ -226,6 +226,19 @@ async def insert_crop_stages(db: AsyncSession, rows: list[dict]) -> None:
         )
     await db.commit()
 
+async def delete_crop(db: AsyncSession, crop_name: str) -> None:
+    # Delete translations for crop stages belonging to this crop first
+    await db.execute(
+        text("DELETE FROM crop_stage_translations WHERE knowledge_uid IN (SELECT uid FROM crop_stage_knowledge WHERE LOWER(crop_name) = LOWER(:crop_name))"),
+        {"crop_name": crop_name}
+    )
+    # Delete the crop stages
+    await db.execute(
+        text("DELETE FROM crop_stage_knowledge WHERE LOWER(crop_name) = LOWER(:crop_name)"),
+        {"crop_name": crop_name}
+    )
+    await db.commit()
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _serialize(row: dict) -> dict:

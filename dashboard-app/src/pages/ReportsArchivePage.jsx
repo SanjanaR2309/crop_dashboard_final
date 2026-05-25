@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import { fetchReports, generateCropReport } from '../api/cropApi'
+import { fetchReports, generateCropReport, deleteCrop } from '../api/cropApi'
 
 export default function ReportsArchivePage() {
   const navigate = useNavigate()
@@ -12,6 +12,75 @@ export default function ReportsArchivePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState(null)
   const [generateSuccess, setGenerateSuccess] = useState(null)
+
+  // Delete Crop states
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [cropToDelete, setCropToDelete] = useState(null)
+  const [confirmAdminKey, setConfirmAdminKey] = useState('')
+  const [deleteError, setDeleteError] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleInitiateDelete = (cropName) => {
+    setCropToDelete(cropName)
+    setConfirmAdminKey('')
+    setDeleteError(null)
+    setIsDeleting(false)
+    setIsDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    if (isDeleting) return
+    setIsDeleteModalOpen(false)
+    setCropToDelete(null)
+    setConfirmAdminKey('')
+    setDeleteError(null)
+  }
+
+  const handleConfirmDelete = async (e) => {
+    e.preventDefault()
+    if (!cropToDelete) return
+
+    if (confirmAdminKey !== import.meta.env.VITE_ADMIN_KEY) {
+      setDeleteError('Incorrect Admin Key. Delete authorization failed.')
+      return
+    }
+
+    setIsDeleting(true)
+    setDeleteError(null)
+
+    try {
+      const res = await deleteCrop(cropToDelete)
+      if (res.success) {
+        setGenerateSuccess(`Successfully deleted "${cropToDelete}" and all its growth stages from the database!`)
+        setIsDeleteModalOpen(false)
+        setCropToDelete(null)
+        setConfirmAdminKey('')
+        
+        // Reload all reports to update tree and filters
+        setLoading(true)
+        const updatedData = await fetchReports({ page: 1, page_size: 1000 })
+        const items = updatedData.items || []
+        setAllReports(items)
+        setLoading(false)
+        
+        setTimeout(() => {
+          setGenerateSuccess(null)
+        }, 8000)
+      } else {
+        setDeleteError('Delete failed. Please try again.')
+      }
+    } catch (err) {
+      console.error(err)
+      setLoading(false)
+      if (err.response && err.response.data && err.response.data.detail) {
+        setDeleteError(err.response.data.detail)
+      } else {
+        setDeleteError('Error deleting crop report. Please check API connection.')
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const closeAddModal = () => {
     if (isGenerating) return
@@ -99,12 +168,8 @@ export default function ReportsArchivePage() {
         const items = data.items || []
         setAllReports(items)
         
-        // Auto-expand all crops initially for immediate feedback
-        const initialCrops = {}
-        items.forEach(r => {
-          if (r.crop_name) initialCrops[r.crop_name] = true
-        })
-        setExpandedCrops(initialCrops)
+        // Keep crops collapsed by default
+        setExpandedCrops({})
       })
       .catch(err => {
         console.error(err)
@@ -468,19 +533,19 @@ export default function ReportsArchivePage() {
                     >
                       {/* Tier 1: Crop Row */}
                       <div 
-                        onClick={() => toggleCrop(crop.crop_name)}
                         style={{ 
                           padding: '18px 24px', 
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           alignItems: 'center', 
-                          cursor: 'pointer', 
                           background: '#fafafa',
-                          userSelect: 'none',
                           borderBottom: isCropExpanded ? '1px solid var(--border)' : 'none'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div 
+                          onClick={() => toggleCrop(crop.crop_name)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, userSelect: 'none' }}
+                        >
                           <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--text-secondary)', transform: isCropExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
                             chevron_right
                           </span>
@@ -488,8 +553,31 @@ export default function ReportsArchivePage() {
                             🌾 {crop.crop_name}
                           </span>
                         </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Latest Update: {formatDate(crop.latest_date)}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            Latest Update: {formatDate(crop.latest_date)}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleInitiateDelete(crop.crop_name);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--danger)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              transition: 'all 0.2s',
+                            }}
+                            className="delete-crop-btn"
+                            title={`Delete ${crop.crop_name}`}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#dc2626' }}>delete</span>
+                          </button>
                         </div>
                       </div>
 
@@ -498,7 +586,7 @@ export default function ReportsArchivePage() {
                         <div style={{ padding: '8px 16px' }}>
                           {Object.values(crop.phases).sort((a, b) => a.phase_name.localeCompare(b.phase_name)).map(phase => {
                             const phaseKey = `${crop.crop_name}|${phase.phase_name}`
-                            const isPhaseExpanded = expandedPhases[phaseKey] !== false // Default to expanded for immediate detail
+                            const isPhaseExpanded = !!expandedPhases[phaseKey] // Closed by default
                             
                             return (
                               <div key={phase.phase_name} style={{ margin: '8px 0', borderLeft: '2px solid var(--border)', paddingLeft: 16 }}>
@@ -736,6 +824,154 @@ export default function ReportsArchivePage() {
                     }}
                   >
                     Generate Report
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Crop Modal (Re-authentication required) ─────────────────────────────────── */}
+      {isDeleteModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '32px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+            position: 'relative'
+          }}>
+            {/* Modal Close Button */}
+            {!isDeleting && (
+              <button 
+                onClick={closeDeleteModal}
+                style={{
+                  position: 'absolute',
+                  top: 20,
+                  right: 20,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            )}
+
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+              ⚠️ Delete Crop: {cropToDelete}?
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: '1.5' }}>
+              <strong>Warning:</strong> This will permanently delete the crop <strong>"{cropToDelete}"</strong> and all of its associated growth stages/recommendations from the database. <strong>This action cannot be undone.</strong>
+            </p>
+
+            {deleteError && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                color: '#b91c1c',
+                padding: '12px 16px',
+                borderRadius: '6px',
+                fontSize: 13,
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {isDeleting ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', textAlign: 'center' }}>
+                <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3, borderTopColor: '#dc2626', borderRadius: '50%', borderStyle: 'solid', animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: 18, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Deleting crop & purging all stages…
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Removing "{cropToDelete}" from database permanently.
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmDelete}>
+                <div style={{ marginBottom: 24 }}>
+                  <label htmlFor="admin-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                    Enter Admin Key to Unlock Deletion
+                  </label>
+                  <input
+                    id="admin-key-input"
+                    type="password"
+                    placeholder="Enter your VITE_ADMIN_KEY password…"
+                    value={confirmAdminKey}
+                    onChange={e => setConfirmAdminKey(e.target.value)}
+                    autoFocus
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      fontSize: 14,
+                      background: 'var(--surface)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      transition: 'border-color 0.15s'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={closeDeleteModal}
+                    className="btn-cancel"
+                    style={{
+                      padding: '10px 18px',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '10px 20px',
+                      background: '#dc2626',
+                      border: '1px solid #dc2626',
+                      borderRadius: '6px',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                  >
+                    Confirm Delete
                   </button>
                 </div>
               </form>

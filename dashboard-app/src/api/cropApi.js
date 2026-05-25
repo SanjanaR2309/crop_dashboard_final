@@ -35,6 +35,9 @@ export const fetchAllCrops = () =>
 export const fetchTranslationStatus = () =>
   api.get('/api/admin/translation-status').then(r => r.data)
 
+export const deleteCrop = (cropName) =>
+  api.delete(`/api/admin/crops/${cropName}`).then(r => r.data)
+
 // ── Add Crop (Full Generation) ───────────────────────────────────────────────
 export const generateCropReport = (cropName) =>
   api.post('/api/crop-knowledge/generate', { crop_name: cropName }).then(r => r.data)
