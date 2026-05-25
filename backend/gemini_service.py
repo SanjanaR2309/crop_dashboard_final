@@ -27,27 +27,25 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return JSON with exactly these six string keys:
+Return ONLY a valid JSON object with exactly these 6 string keys.
+Be specific to {crop_name} at this exact growth sub-stage. Use only CIBRC-registered chemicals used in Indian agriculture.
+
+For "pest_management" and "disease_management", write as a single compact paragraph using this format:
+  Cultural: <2–3 concise practical sentences on field-level management>. Biological: <1–2 sentences on biocontrol agents or natural enemies>. Chemical: Spray <Chemical Name + Concentration> @ <X ml/L | Xx ml/20L knapsack | X L/ha in 500L water>[; or <Alt Chemical Name + Concentration> @ <X ml/L | Xx ml/20L knapsack | X L/ha in 500L water>]. Apply at <spray timing/frequency>.
 
 {{
-  "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
-  "pest_risk_factors":    "<comma-separated agronomic and climatic conditions that increase pest risk>",
-  "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: Spray <exact chemical name & active ingredient concentration>.\\n\\nMix & Dosage Chart:\\n• Per Litre: <exact ml/g> per 1 Litre of water\\n• Per Knapsack Pump (20 Litres): <exact ml/g> in 20 Litres of water (e.g. 80 ml in 20L)\\n• Per Hectare: <exact ml/g or Litres> in <litres of water, e.g. 500L> per Hectare",
-  "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
-  "disease_risk_factors": "<comma-separated conditions that promote disease>",
-  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: Spray <exact chemical name & active ingredient concentration>.\\n\\nMix & Dosage Chart:\\n• Per Litre: <exact ml/g> per 1 Litre of water\\n• Per Knapsack Pump (20 Litres): <exact ml/g> in 20 Litres of water (e.g. 80 ml in 20L)\\n• Per Hectare: <exact ml/g or Litres> in <litres of water, e.g. 500L> per Hectare"
+  "susceptible_pests":    "<comma-separated list of 6–8 key pests active at this sub-stage>",
+  "pest_risk_factors":    "<comma-separated list of 5–7 agronomic and climatic conditions that increase pest pressure>",
+  "pest_management":      "Cultural: <2–3 sentences>. Biological: <1–2 sentences>. Chemical: Spray <Name Conc> @ <Xml/L | Xxm/20L knapsack | XL/ha in 500L water>[; or <Alt Name Conc> @ <doses>]. Apply at <timing>.",
+  "susceptible_diseases": "<comma-separated list of 6–8 key diseases active at this sub-stage>",
+  "disease_risk_factors": "<comma-separated list of 5–7 conditions that promote disease onset>",
+  "disease_management":   "Cultural: <2–3 sentences>. Biological: <1–2 sentences>. Chemical: Spray <Name Conc> @ <Xml/L | Xxm/20L knapsack | XL/ha in 500L water>[; or <Alt Name Conc> @ <doses>]. Apply at <timing>."
 }}
 
-IMPORTANT REQUIREMENTS FOR CHEMICAL MANAGEMENT:
-For the 'Chemical:' advisory in both 'pest_management' and 'disease_management', you MUST provide:
-1. The exact name of the chemical insecticide/fungicide and its active ingredient concentration (e.g., Imidacloprid 17.8% SL, Chlorpyriphos 20% EC, Carbendazim 50% WP).
-2. A structured **Mix & Dosage Chart** covering these three scales:
-   a) **Per Litre**: Exact dilution rate (e.g., '2 ml/litre of water', '1.5 g/litre of water').
-   b) **Per Knapsack Pump (20 Litres)**: The exact amount of chemical needed to mix in a standard 20-litre farmer pump (e.g., '40 ml in 20 Litres of water', '80 ml in 20 Litres of water').
-   c) **Per Hectare**: The total chemical quantity and water volume required per hectare (e.g., '1.0 Litre of chemical in 500 Litres of water per hectare').
-3. **If multiple alternative chemicals are recommended** (e.g. 'Malathion 50 EC or Quinalphos 25 EC'), you MUST provide a separate, distinct **Mix & Dosage Chart** for **each** recommended chemical individually so the user has the exact ratios for whichever option they buy.
-
-Ensure all calculations are mathematically consistent (e.g. if Per Litre is 4 ml/L, then Per Knapsack Pump (20L) must be 80 ml/20L, and Per Hectare must be 2 Litres in 500 Litres of water per hectare). Be extremely specific to {crop_name} at this exact sub-stage. Use standard and approved Indian agricultural crop-protection advisory guidelines.\
+Dosage rules (strictly enforce):
+- Dosage math must be consistent: if rate is X ml/L, then knapsack dose = 20X ml per 20L, and per-hectare = 500X ml (or X/2 L) in 500L water.
+- Provide at most 2 chemical alternatives per management section.
+- Include spray timing (e.g. "at 30 DAS", "at first sign of infestation", "repeat every 10 days").\
 """
 
 _REGEN_FALLBACK = {
