@@ -32,13 +32,19 @@ Return JSON with exactly these six string keys:
 {{
   "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
   "pest_risk_factors":    "<comma-separated agronomic and climatic conditions that increase pest risk>",
-  "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
+  "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: Spray <exact chemical name & active ingredient concentration> @ <exact dosage in ml or grams per litre of water> (e.g. mix <exact quantity in ml/g> in <litres of water> per hectare).",
   "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
   "disease_risk_factors": "<comma-separated conditions that promote disease>",
-  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: <practices>."
+  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: Spray <exact chemical name & active ingredient concentration> @ <exact dosage in ml or grams per litre of water> (e.g. mix <exact quantity in ml/g> in <litres of water> per hectare)."
 }}
 
-Be specific to {crop_name} at this exact sub-stage. Use Indian crop-protection context.\
+IMPORTANT REQUIREMENTS FOR CHEMICAL MANAGEMENT:
+For the 'Chemical:' advisory in both 'pest_management' and 'disease_management', you MUST provide:
+1. The exact name of the chemical insecticide/fungicide and its active ingredient concentration (e.g., Imidacloprid 17.8% SL, Chlorpyriphos 20% EC, Carbendazim 50% WP).
+2. The exact mixture dilution: specify the precise number of ml or grams per litre of water (e.g., '1.5 ml/litre of water', '2 g/litre of water').
+3. The total application mix per hectare: specify the exact quantity of chemical (in grams or ml) mixed in the standard volume of water required per hectare (e.g., '500 ml of chemical in 500 litres of water per hectare').
+
+Be extremely specific to {crop_name} at this exact sub-stage. Use standard and approved Indian agricultural crop-protection advisory guidelines.\
 """
 
 _REGEN_FALLBACK = {
