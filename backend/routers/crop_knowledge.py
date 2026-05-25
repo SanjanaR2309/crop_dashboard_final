@@ -131,22 +131,21 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
     if not stages:
         raise HTTPException(status_code=502, detail="Failed to discover growth stages for this crop")
 
-    # 3. Call regenerate_stage concurrently for each stage to generate complete advisory details
-    tasks = []
+    # 3. Call regenerate_stage sequentially with a small delay to avoid hitting Gemini Free Tier rate limits
+    stages_knowledge = []
     for s in stages:
-        tasks.append(
-            regenerate_stage(
-                crop_name=crop_name,
-                main_stage=s["main_stage"],
-                sub_stage_name=s["sub_stage_name"],
-                start_day=s["start_day"],
-                end_day=s["end_day"],
-                api_key=api_key,
-                model=model,
-            )
+        res = await regenerate_stage(
+            crop_name=crop_name,
+            main_stage=s["main_stage"],
+            sub_stage_name=s["sub_stage_name"],
+            start_day=s["start_day"],
+            end_day=s["end_day"],
+            api_key=api_key,
+            model=model,
         )
-
-    stages_knowledge = await asyncio.gather(*tasks)
+        stages_knowledge.append(res)
+        # 1-second delay to guarantee we don't trigger the concurrency or RPM rate limits
+        await asyncio.sleep(1.0)
 
     # 4. Map results and prepare database rows
     rows_to_insert = []
