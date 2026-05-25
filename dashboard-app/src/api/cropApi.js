@@ -21,6 +21,10 @@ export const saveReport = (uid, data) =>
 export const regenerateReport = (uid) =>
   api.post(`/api/crop-knowledge/${uid}/regenerate`).then(r => r.data)
 
+// ── Generate Env Conditions (on-demand) ──────────────────────────────────────
+export const generateEnvConditions = (uid) =>
+  api.post(`/api/crop-knowledge/${uid}/generate-env`).then(r => r.data)
+
 // ── Translations ─────────────────────────────────────────────────────────────
 export const fetchTranslation = (uid, lang = 'kn') =>
   api.get(`/api/translations/${uid}`, { params: { lang } }).then(r => r.data)

@@ -10,7 +10,7 @@ from typing import Optional
 
 from database import get_db
 import queries
-from gemini_service import regenerate_stage, generate_crop_stages_template
+from gemini_service import regenerate_stage, generate_crop_stages_template, generate_env_conditions
 import asyncio
 from uuid import uuid4
 from fastapi import HTTPException
@@ -82,16 +82,6 @@ async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
         api_key=api_key,
         model=model,
     )
-    # Ensure no fields in new_data are None or empty by falling back to original report values
-    keys_to_fallback = [
-        "susceptible_pests",
-        "pest_risk_factors",
-        "pest_management",
-        "susceptible_diseases",
-        "disease_risk_factors",
-        "disease_management"
-    ]
-    # Ensure no fields in new_data are None or empty by falling back to original report values
     keys_to_fallback = [
         "susceptible_pests",
         "pest_risk_factors",
@@ -106,6 +96,45 @@ async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
 
     # Return new data alongside original for diff — do NOT save yet
     return {**report, **new_data, "_is_regenerated": True}
+
+
+# ── Generate Env Conditions (on-demand) ─────────────────────────────────
+
+@router.post("/crop-knowledge/{uid}/generate-env")
+async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
+    report = await queries.get_report_by_uid(db, uid)
+    if not report:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+    env = await generate_env_conditions(
+        crop_name=report["crop_name"],
+        main_stage=report["main_stage"],
+        sub_stage_name=report["sub_stage_name"],
+        start_day=report["start_day"] or 0,
+        end_day=report["end_day"] or 0,
+        api_key=api_key,
+        model=model,
+    )
+
+    if not env:
+        raise HTTPException(status_code=502, detail="Failed to generate environmental conditions")
+
+    # Save directly to DB
+    import json
+    env_json = json.dumps(env) if isinstance(env, dict) else env
+    from sqlalchemy import text
+    await db.execute(text("""
+        UPDATE crop_stage_knowledge
+        SET env_conditions = CAST(:env AS jsonb), updated_at = now()
+        WHERE uid = :uid
+    """), {"uid": uid, "env": env_json})
+    await db.commit()
+
+    # Return updated full report
+    return await queries.get_report_by_uid(db, uid)
 
 
 # ── Add New Crop (Full Generation) ───────────────────────────────────────────

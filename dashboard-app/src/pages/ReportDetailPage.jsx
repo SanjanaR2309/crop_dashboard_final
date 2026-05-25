@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import Navbar from '../components/Navbar'
-import { fetchReportByUid, fetchTranslation, regenerateReport, saveReport } from '../api/cropApi'
+import { fetchReportByUid, fetchTranslation, regenerateReport, generateEnvConditions, saveReport } from '../api/cropApi'
 
 function formatDate(ts) {
   try { return format(new Date(ts), 'MMM dd, yyyy') } catch { return ts || '' }
@@ -210,6 +210,8 @@ export default function ReportDetailPage() {
   const [loading, setLoading] = useState(true)
   const [regen, setRegen] = useState(false)     // regenerating in progress
   const [regenError, setRegenError] = useState(null)
+  const [genEnv, setGenEnv] = useState(false)
+  const [genEnvError, setGenEnvError] = useState(null)
   const [error, setError] = useState(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
@@ -317,12 +319,24 @@ export default function ReportDetailPage() {
     setRegenError(null)
     try {
       const newData = await regenerateReport(uid)
-      // Navigate to diff comparison — original stays intact
       navigate(`/reports/${uid}/compare`, { state: { original: report, regenerated: newData } })
     } catch (e) {
       setRegenError('Regeneration failed: ' + (e.response?.data?.detail || e.message))
     } finally {
       setRegen(false)
+    }
+  }
+
+  const handleGenerateEnv = async () => {
+    setGenEnv(true)
+    setGenEnvError(null)
+    try {
+      const updated = await generateEnvConditions(uid)
+      setReport(updated)
+    } catch (e) {
+      setGenEnvError('Env generation failed: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setGenEnv(false)
     }
   }
 
@@ -399,7 +413,7 @@ export default function ReportDetailPage() {
                   <button
                     className="btn btn-primary"
                     onClick={handleRegenerate}
-                    disabled={regen || loading}
+                    disabled={regen || genEnv || loading}
                     style={{
                       minWidth: 120,
                       justifyContent: 'center',
@@ -424,6 +438,33 @@ export default function ReportDetailPage() {
                     {regen
                       ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} />&nbsp;Regenerating…</>
                       : <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>refresh</span>&nbsp;Regenerate</>
+                    }
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={handleGenerateEnv}
+                    disabled={regen || genEnv || loading}
+                    title="Generate environmental conditions data for this stage"
+                    style={{
+                      minWidth: 130,
+                      justifyContent: 'center',
+                      backgroundColor: genEnv ? '#166534' : '#16a34a',
+                      borderColor: '#16a34a',
+                      color: '#ffffff',
+                      fontWeight: 600,
+                      boxShadow: '0 2px 4px rgba(22,163,74,0.15)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseOver={(e) => {
+                      if (!genEnv && !loading) e.currentTarget.style.backgroundColor = '#15803d';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#16a34a';
+                    }}
+                  >
+                    {genEnv
+                      ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} />&nbsp;Generating…</>
+                      : <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>eco</span>&nbsp;Generate Env</>
                     }
                   </button>
                 </>
