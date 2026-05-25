@@ -27,7 +27,7 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return JSON with exactly these six string keys:
+Return JSON with exactly these seven string keys:
 
 {{
   "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
@@ -35,7 +35,20 @@ Return JSON with exactly these six string keys:
   "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
   "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
   "disease_risk_factors": "<comma-separated conditions that promote disease>",
-  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: <practices>."
+  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
+  "env_conditions": {{
+    "uv_index":          "<e.g. Moderate to High (5-9)>",
+    "temp_max_c":        "<number, e.g. 35>",
+    "temp_min_c":        "<number, e.g. 20>",
+    "photoperiod":       "<e.g. 12-14 hours>",
+    "soil_temp_c":       "<range, e.g. 22-30>",
+    "irrigation_mm":     "<per-week range, e.g. 25-50>",
+    "optimal_temp_c":    "<range, e.g. 25-32>",
+    "avg_yield_kg_ha":   "<expected yield at this stage or 0 if pre-harvest, e.g. 0 or 4500>",
+    "rel_humidity_pct":  "<range, e.g. 60-80>",
+    "harvest_index_pct": "<0 to 100 depending on stage, e.g. 0 or 45>",
+    "soil_moisture_pct": "<description or range, e.g. Saturated to field capacity (25-35%)>"
+  }}
 }}
 
 Be specific to {crop_name} at this exact sub-stage. Use Indian crop-protection context.\
@@ -48,6 +61,7 @@ _REGEN_FALLBACK = {
     "susceptible_diseases": None,
     "disease_risk_factors": None,
     "disease_management":   None,
+    "env_conditions":       None,
 }
 
 # ── Enhanced Kannada translation prompt ──────────────────────────────────────

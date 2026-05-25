@@ -164,6 +164,7 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
             "susceptible_diseases": knowledge.get("susceptible_diseases") or "",
             "disease_risk_factors": knowledge.get("disease_risk_factors") or "",
             "disease_management": knowledge.get("disease_management") or "",
+            "env_conditions": knowledge.get("env_conditions"),
         }
         rows_to_insert.append(row)
 

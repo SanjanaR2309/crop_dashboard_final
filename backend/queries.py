@@ -108,6 +108,8 @@ async def get_report_by_uid(db: AsyncSession, uid: str) -> Optional[dict]:
     return _serialize(dict(row._mapping)) if row else None
 
 async def upsert_report(db: AsyncSession, uid: str, data: dict) -> dict:
+    env = data.get("env_conditions")
+    env_json = json.dumps(env) if isinstance(env, dict) else env
     await db.execute(
         text(
             "UPDATE crop_stage_knowledge SET "
@@ -117,11 +119,12 @@ async def upsert_report(db: AsyncSession, uid: str, data: dict) -> dict:
             "  susceptible_diseases = :susceptible_diseases, "
             "  disease_risk_factors = :disease_risk_factors, "
             "  disease_management   = :disease_management, "
+            "  env_conditions       = CAST(:env_conditions AS jsonb), "
             "  data_source          = 'llm', "
             "  updated_at           = now() "
             "WHERE uid = :uid"
         ),
-        {"uid": uid, **data},
+        {"uid": uid, **{k: v for k, v in data.items() if k != "env_conditions"}, "env_conditions": env_json},
     )
     await db.commit()
     return await get_report_by_uid(db, uid)
@@ -208,21 +211,24 @@ async def crop_exists(db: AsyncSession, crop_name: str) -> bool:
 
 async def insert_crop_stages(db: AsyncSession, rows: list[dict]) -> None:
     for row in rows:
+        # Serialize env_conditions dict to JSON string for JSONB storage
+        env = row.get("env_conditions")
+        env_json = json.dumps(env) if isinstance(env, dict) else env
         await db.execute(
             text("""
                 INSERT INTO crop_stage_knowledge (
                     uid, crop_name, main_stage, sub_stage_name, start_day, end_day,
                     susceptible_pests, pest_risk_factors, pest_management,
                     susceptible_diseases, disease_risk_factors, disease_management,
-                    data_source, created_at, updated_at
+                    env_conditions, data_source, created_at, updated_at
                 ) VALUES (
                     :uid, :crop_name, :main_stage, :sub_stage_name, :start_day, :end_day,
                     :susceptible_pests, :pest_risk_factors, :pest_management,
                     :susceptible_diseases, :disease_risk_factors, :disease_management,
-                    'llm', now(), now()
+                    CAST(:env_conditions AS jsonb), 'llm', now(), now()
                 )
             """),
-            row
+            {**row, "env_conditions": env_json}
         )
     await db.commit()
 
@@ -245,7 +251,9 @@ def _serialize(row: dict) -> dict:
     for k, v in row.items():
         if isinstance(v, datetime):
             row[k] = v.isoformat()
-        elif isinstance(v, str) and k == "env_conditions":
-            try: row[k] = json.loads(v)
-            except: pass
+        elif k == "env_conditions":
+            if isinstance(v, str):
+                try: row[k] = json.loads(v)
+                except: pass
+            # if already a dict (from JSONB), leave as-is
     return row
