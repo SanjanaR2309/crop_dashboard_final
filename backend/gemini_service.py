@@ -305,8 +305,12 @@ async def generate_env_conditions(
     end_day: int,
     api_key: str,
     model: str,
-) -> dict | None:
+):
     """Separately generate env_conditions for a single stage (on-demand)."""
+    if not api_key:
+        logger.warning("GEMINI_API_KEY not set — skipping env conditions call")
+        return None
+
     prompt = _ENV_PROMPT.format(
         crop_name=crop_name,
         main_stage=main_stage,
@@ -314,8 +318,49 @@ async def generate_env_conditions(
         start_day=start_day,
         end_day=end_day,
     )
-    result = await _call_gemini(prompt, _ENV_FALLBACK, api_key, model, max_tokens=1024)
-    return result.get("env_conditions")
+    payload = {
+        "system_instruction": {"parts": [{"text": _SYSTEM}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 1024,
+            "temperature": 0.1,
+            "responseMimeType": "application/json",
+        },
+    }
+
+    raw = ""
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                _API_URL.format(model=model, api_key=api_key),
+                json=payload,
+                headers={"content-type": "application/json"},
+            )
+            resp.raise_for_status()
+
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        # Strip markdown fences
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:].strip()
+
+        data = json.loads(raw)
+
+        # Handle both {"env_conditions": {...}} and direct {...} response formats
+        env = data.get("env_conditions", data)
+        if isinstance(env, dict) and env:
+            return env
+        return None
+
+    except httpx.HTTPStatusError as e:
+        logger.error("Gemini env API %s: %s", e.response.status_code, e.response.text[:200])
+        return None
+    except Exception as e:
+        logger.error("Failed to generate env conditions: %s | raw[:100]=%s", e, raw[:100])
+        return None
 
 
 async def translate_stage(

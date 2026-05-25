@@ -522,11 +522,26 @@ export default function ReportDetailPage() {
           </div>
         )}
 
+        {/* ── Gen Env error banner ─────────────────────────────────────────── */}
+        {genEnvError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 24, fontSize: 13, color: 'var(--danger)' }}>
+            {genEnvError}
+          </div>
+        )}
+
         {/* ── Regen in-progress banner ──────────────────────────────────────── */}
         {regen && (
           <div style={{ background: '#eff4ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 24, fontSize: 13, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
             Calling Gemini 2.5 Flash to regenerate this report… this may take a few seconds.
+          </div>
+        )}
+
+        {/* ── Gen Env in-progress banner ────────────────────────────────────── */}
+        {genEnv && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 24, fontSize: 13, color: '#15803d', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#bbf7d0', borderTopColor: '#16a34a' }} />
+            Generating environmental conditions… this takes a few seconds.
           </div>
         )}
 
