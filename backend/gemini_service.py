@@ -45,6 +45,7 @@ For the 'Chemical:' advisory in both 'pest_management' and 'disease_management',
    a) **Per Litre**: Exact dilution rate (e.g., '2 ml/litre of water', '1.5 g/litre of water').
    b) **Per Knapsack Pump (20 Litres)**: The exact amount of chemical needed to mix in a standard 20-litre farmer pump (e.g., '40 ml in 20 Litres of water', '80 ml in 20 Litres of water').
    c) **Per Hectare**: The total chemical quantity and water volume required per hectare (e.g., '1.0 Litre of chemical in 500 Litres of water per hectare').
+3. **If multiple alternative chemicals are recommended** (e.g. 'Malathion 50 EC or Quinalphos 25 EC'), you MUST provide a separate, distinct **Mix & Dosage Chart** for **each** recommended chemical individually so the user has the exact ratios for whichever option they buy.
 
 Ensure all calculations are mathematically consistent (e.g. if Per Litre is 4 ml/L, then Per Knapsack Pump (20L) must be 80 ml/20L, and Per Hectare must be 2 Litres in 500 Litres of water per hectare). Be extremely specific to {crop_name} at this exact sub-stage. Use standard and approved Indian agricultural crop-protection advisory guidelines.\
 """
