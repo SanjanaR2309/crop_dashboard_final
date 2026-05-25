@@ -27,25 +27,18 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return ONLY a valid JSON object with exactly these 6 string keys.
-Be specific to {crop_name} at this exact growth sub-stage. Use only CIBRC-registered chemicals used in Indian agriculture.
-
-For "pest_management" and "disease_management", write as a single compact paragraph using this format:
-  Cultural: <2–3 concise practical sentences on field-level management>. Biological: <1–2 sentences on biocontrol agents or natural enemies>. Chemical: Spray <Chemical Name + Concentration> @ <X ml/L | Xx ml/20L knapsack | X L/ha in 500L water>[; or <Alt Chemical Name + Concentration> @ <X ml/L | Xx ml/20L knapsack | X L/ha in 500L water>]. Apply at <spray timing/frequency>.
+Return JSON with exactly these six string keys:
 
 {{
-  "susceptible_pests":    "<comma-separated list of 6–8 key pests active at this sub-stage>",
-  "pest_risk_factors":    "<comma-separated list of 5–7 agronomic and climatic conditions that increase pest pressure>",
-  "pest_management":      "Cultural: <2–3 sentences>. Biological: <1–2 sentences>. Chemical: Spray <Name Conc> @ <Xml/L | Xxm/20L knapsack | XL/ha in 500L water>[; or <Alt Name Conc> @ <doses>]. Apply at <timing>.",
-  "susceptible_diseases": "<comma-separated list of 6–8 key diseases active at this sub-stage>",
-  "disease_risk_factors": "<comma-separated list of 5–7 conditions that promote disease onset>",
-  "disease_management":   "Cultural: <2–3 sentences>. Biological: <1–2 sentences>. Chemical: Spray <Name Conc> @ <Xml/L | Xxm/20L knapsack | XL/ha in 500L water>[; or <Alt Name Conc> @ <doses>]. Apply at <timing>."
+  "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
+  "pest_risk_factors":    "<comma-separated agronomic and climatic conditions that increase pest risk>",
+  "pest_management":      "Cultural: <practices>. Biological: <practices>. Chemical: <practices>.",
+  "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
+  "disease_risk_factors": "<comma-separated conditions that promote disease>",
+  "disease_management":   "Cultural: <practices>. Biological: <practices>. Chemical: <practices>."
 }}
 
-Dosage rules (strictly enforce):
-- Dosage math must be consistent: if rate is X ml/L, then knapsack dose = 20X ml per 20L, and per-hectare = 500X ml (or X/2 L) in 500L water.
-- Provide at most 2 chemical alternatives per management section.
-- Include spray timing (e.g. "at 30 DAS", "at first sign of infestation", "repeat every 10 days").\
+Be specific to {crop_name} at this exact sub-stage. Use Indian crop-protection context.\
 """
 
 _REGEN_FALLBACK = {
