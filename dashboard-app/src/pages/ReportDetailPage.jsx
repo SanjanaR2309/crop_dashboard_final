@@ -443,28 +443,37 @@ export default function ReportDetailPage() {
                   <button
                     className="btn"
                     onClick={handleGenerateEnv}
-                    disabled={regen || genEnv || loading}
-                    title="Generate environmental conditions data for this stage"
-                    style={{
-                      minWidth: 130,
-                      justifyContent: 'center',
-                      backgroundColor: genEnv ? '#166534' : '#16a34a',
-                      borderColor: '#16a34a',
-                      color: '#ffffff',
-                      fontWeight: 600,
-                      boxShadow: '0 2px 4px rgba(22,163,74,0.15)',
-                      transition: 'all 0.2s ease',
-                    }}
+                    disabled={regen || genEnv || loading || !!(report?.env_conditions && Object.keys(report.env_conditions || {}).length > 0)}
+                    title={report?.env_conditions ? 'Environmental conditions already generated for this stage' : 'Generate environmental conditions data for this stage'}
+                    style={(() => {
+                      const hasEnv = !!(report?.env_conditions && Object.keys(report.env_conditions || {}).length > 0)
+                      return {
+                        minWidth: 130,
+                        justifyContent: 'center',
+                        backgroundColor: hasEnv ? '#9ca3af' : genEnv ? '#166534' : '#16a34a',
+                        borderColor: hasEnv ? '#9ca3af' : '#16a34a',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        cursor: hasEnv ? 'not-allowed' : 'pointer',
+                        boxShadow: hasEnv ? 'none' : '0 2px 4px rgba(22,163,74,0.15)',
+                        transition: 'all 0.2s ease',
+                        opacity: hasEnv ? 0.7 : 1,
+                      }
+                    })()}
                     onMouseOver={(e) => {
-                      if (!genEnv && !loading) e.currentTarget.style.backgroundColor = '#15803d';
+                      const hasEnv = !!(report?.env_conditions && Object.keys(report.env_conditions || {}).length > 0)
+                      if (!genEnv && !loading && !hasEnv) e.currentTarget.style.backgroundColor = '#15803d'
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = '#16a34a';
+                      const hasEnv = !!(report?.env_conditions && Object.keys(report.env_conditions || {}).length > 0)
+                      e.currentTarget.style.backgroundColor = hasEnv ? '#9ca3af' : '#16a34a'
                     }}
                   >
                     {genEnv
                       ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} />&nbsp;Generating…</>
-                      : <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>eco</span>&nbsp;Generate Env</>
+                      : report?.env_conditions && Object.keys(report.env_conditions || {}).length > 0
+                        ? <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>task_alt</span>&nbsp;Env Generated</>
+                        : <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>eco</span>&nbsp;Generate Env</>
                     }
                   </button>
                 </>

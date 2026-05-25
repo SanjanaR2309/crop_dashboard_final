@@ -239,7 +239,7 @@ export default function ReportsArchivePage() {
 
       // 5. Status filter
       if (selectedStatuses.length > 0) {
-        const isVerified = verifiedUids.includes(r.uid)
+        const isVerified = !!(r.env_conditions && Object.keys(r.env_conditions).length > 0)
         const isLlm = r.data_source === 'llm'
         const isCsv = r.data_source === 'csv'
 
@@ -526,10 +526,10 @@ export default function ReportsArchivePage() {
                 {Object.values(groupedTree).sort((a, b) => a.crop_name.localeCompare(b.crop_name)).map(crop => {
                   const isCropExpanded = !!expandedCrops[crop.crop_name]
                   
-                  // Calculate dynamic verification stats for the crop
+                  // Calculate dynamic verification stats for the crop (env_conditions = verified)
                   const allCropStages = Object.values(crop.phases).flatMap(p => p.subStages)
                   const cropTotalCount = allCropStages.length
-                  const cropVerifiedCount = allCropStages.filter(s => verifiedUids.includes(s.uid)).length
+                  const cropVerifiedCount = allCropStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0)).length
                   const isCropFullyVerified = cropVerifiedCount === cropTotalCount && cropTotalCount > 0
 
                   return (
@@ -556,7 +556,7 @@ export default function ReportsArchivePage() {
                             chevron_right
                           </span>
                           <span style={{ fontSize: 18, fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                            🌾 {crop.crop_name}
+                            {crop.crop_name}
                             {isCropFullyVerified ? (
                               <span style={{ fontSize: 11, color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 12, fontWeight: 800 }}>verified</span> Fully Verified
@@ -603,9 +603,9 @@ export default function ReportsArchivePage() {
                             const phaseKey = `${crop.crop_name}|${phase.phase_name}`
                             const isPhaseExpanded = !!expandedPhases[phaseKey] // Closed by default
                             
-                            // Calculate dynamic verification stats for the sub-phase
+                            // Calculate dynamic verification stats for the sub-phase (env_conditions = verified)
                             const phaseTotalCount = phase.subStages.length
-                            const phaseVerifiedCount = phase.subStages.filter(s => verifiedUids.includes(s.uid)).length
+                            const phaseVerifiedCount = phase.subStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0)).length
                             const isPhaseFullyVerified = phaseVerifiedCount === phaseTotalCount && phaseTotalCount > 0
 
                             return (
@@ -630,7 +630,7 @@ export default function ReportsArchivePage() {
                                       chevron_right
                                     </span>
                                     <span style={{ fontSize: 14, fontWeight: 700, color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                      🌿 {phase.phase_name}
+                                      {phase.phase_name}
                                       {isPhaseFullyVerified ? (
                                         <span style={{ fontSize: 10, color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                                           ✓ Verified
@@ -651,7 +651,7 @@ export default function ReportsArchivePage() {
                                 {isPhaseExpanded && (
                                   <div style={{ padding: '8px 0 8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {phase.subStages.map(stage => {
-                                      const isVerified = verifiedUids.includes(stage.uid)
+                                      const isVerified = !!(stage.env_conditions && Object.keys(stage.env_conditions).length > 0)
                                       
                                       return (
                                         <div
@@ -683,11 +683,11 @@ export default function ReportsArchivePage() {
                                           <div>
                                             {isVerified ? (
                                               <span className="badge" style={{ color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', fontWeight: 700 }}>
-                                                VERIFIED MANUALLY
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>verified</span> Verified
                                               </span>
                                             ) : stage.data_source === 'llm' ? (
-                                              <span className="badge badge-llm" style={{ fontWeight: 600 }}>
-                                                Reviewed (LLM)
+                                              <span className="badge" style={{ color: '#b45309', background: '#fffbeb', border: '1px solid #fef3c7', fontWeight: 600 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>hourglass_empty</span> Env Not Yet Generated
                                               </span>
                                             ) : (
                                               <span className="badge" style={{ color: '#c2410c', background: '#fff7ed', border: '1px solid #ffedd5', fontWeight: 600 }}>
