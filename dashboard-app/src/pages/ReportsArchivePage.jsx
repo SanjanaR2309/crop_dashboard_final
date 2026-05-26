@@ -239,7 +239,7 @@ export default function ReportsArchivePage() {
 
       // 5. Status filter
       if (selectedStatuses.length > 0) {
-        const isVerified = !!(r.env_conditions && Object.keys(r.env_conditions).length > 0)
+        const isVerified = !!(r.env_conditions && Object.keys(r.env_conditions).length > 0) && verifiedUids.includes(r.uid)
         const isLlm = r.data_source === 'llm'
         const isCsv = r.data_source === 'csv'
 
@@ -526,10 +526,10 @@ export default function ReportsArchivePage() {
                 {Object.values(groupedTree).sort((a, b) => a.crop_name.localeCompare(b.crop_name)).map(crop => {
                   const isCropExpanded = !!expandedCrops[crop.crop_name]
                   
-                  // Calculate dynamic verification stats for the crop (env_conditions = verified)
+                  // Calculate dynamic verification stats for the crop (env_conditions + manual verify = verified)
                   const allCropStages = Object.values(crop.phases).flatMap(p => p.subStages)
                   const cropTotalCount = allCropStages.length
-                  const cropVerifiedCount = allCropStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0)).length
+                  const cropVerifiedCount = allCropStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0) && verifiedUids.includes(s.uid)).length
                   const isCropFullyVerified = cropVerifiedCount === cropTotalCount && cropTotalCount > 0
 
                   return (
@@ -603,9 +603,9 @@ export default function ReportsArchivePage() {
                             const phaseKey = `${crop.crop_name}|${phase.phase_name}`
                             const isPhaseExpanded = !!expandedPhases[phaseKey] // Closed by default
                             
-                            // Calculate dynamic verification stats for the sub-phase (env_conditions = verified)
+                            // Calculate dynamic verification stats for the sub-phase (env_conditions + manual verify = verified)
                             const phaseTotalCount = phase.subStages.length
-                            const phaseVerifiedCount = phase.subStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0)).length
+                            const phaseVerifiedCount = phase.subStages.filter(s => !!(s.env_conditions && Object.keys(s.env_conditions).length > 0) && verifiedUids.includes(s.uid)).length
                             const isPhaseFullyVerified = phaseVerifiedCount === phaseTotalCount && phaseTotalCount > 0
 
                             return (
@@ -651,7 +651,8 @@ export default function ReportsArchivePage() {
                                 {isPhaseExpanded && (
                                   <div style={{ padding: '8px 0 8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {phase.subStages.map(stage => {
-                                      const isVerified = !!(stage.env_conditions && Object.keys(stage.env_conditions).length > 0)
+                                      const isEnvGenerated = !!(stage.env_conditions && Object.keys(stage.env_conditions).length > 0)
+                                      const isVerified = isEnvGenerated && verifiedUids.includes(stage.uid)
                                       
                                       return (
                                         <div
@@ -685,8 +686,12 @@ export default function ReportsArchivePage() {
                                               <span className="badge" style={{ color: '#16a34a', background: '#eafaf1', border: '1px solid #bbf7d0', fontWeight: 700 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>verified</span> Verified
                                               </span>
-                                            ) : stage.data_source === 'llm' ? (
+                                            ) : isEnvGenerated ? (
                                               <span className="badge" style={{ color: '#b45309', background: '#fffbeb', border: '1px solid #fef3c7', fontWeight: 600 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>pending</span> Env Generated - Not Verified
+                                              </span>
+                                            ) : stage.data_source === 'llm' ? (
+                                              <span className="badge" style={{ color: '#c2410c', background: '#fff7ed', border: '1px solid #ffedd5', fontWeight: 600 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>hourglass_empty</span> Env Not Yet Generated
                                               </span>
                                             ) : (
