@@ -46,3 +46,6 @@ export const deleteCrop = (cropName) =>
 export const generateCropReport = (cropName) =>
   api.post('/api/crop-knowledge/generate', { crop_name: cropName }).then(r => r.data)
 
+// ── Admin: Fix Null Stages ───────────────────────────────────────────────────
+export const regenEmpty = () =>
+  api.post('/api/admin/regen-empty').then(r => r.data)

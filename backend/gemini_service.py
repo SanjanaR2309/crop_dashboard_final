@@ -338,9 +338,18 @@ async def generate_env_conditions(
             )
             resp.raise_for_status()
 
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        body = resp.json()
+        candidate = body.get("candidates", [{}])[0]
 
-        # Strip markdown fences
+        # Guard: Gemini may omit 'content' when finishReason is SAFETY/OTHER
+        if "content" not in candidate:
+            finish = candidate.get("finishReason", "UNKNOWN")
+            logger.error("Gemini env: no content in response, finishReason=%s", finish)
+            return None
+
+        raw = candidate["content"]["parts"][0]["text"].strip()
+
+        # Strip markdown fences if present
         if raw.startswith("```"):
             parts = raw.split("```")
             raw = parts[1] if len(parts) > 1 else raw
@@ -359,7 +368,7 @@ async def generate_env_conditions(
         logger.error("Gemini env API %s: %s", e.response.status_code, e.response.text[:200])
         return None
     except Exception as e:
-        logger.error("Failed to generate env conditions: %s | raw[:100]=%s", e, raw[:100])
+        logger.error("Failed to generate env conditions: %s | raw[:200]=%s", e, raw[:200])
         return None
 
 
