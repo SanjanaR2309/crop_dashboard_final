@@ -79,26 +79,31 @@ async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
     if not rows:
         return {"message": "All stages already have data — nothing to fix!", "fixed": 0}
 
+    import httpx
+
     total = len(rows)
     fixed = 0
     errors = []
 
-    # Process in batches of 5 to avoid rate limiting
-    batch_size = 5
-    for i in range(0, total, batch_size):
-        batch = rows[i:i + batch_size]
-        results = await asyncio.gather(*[
-            regenerate_stage(
-                crop_name=r.crop_name,
-                main_stage=r.main_stage,
-                sub_stage_name=r.sub_stage_name,
-                start_day=r.start_day or 0,
-                end_day=r.end_day or 0,
-                api_key=api_key,
-                model=model,
-            )
-            for r in batch
-        ], return_exceptions=True)
+    # Reuse a single AsyncClient to pool connections across all batches
+    async with httpx.AsyncClient(timeout=120) as client:
+        # Process in batches of 5 to avoid rate limiting
+        batch_size = 5
+        for i in range(0, total, batch_size):
+            batch = rows[i:i + batch_size]
+            results = await asyncio.gather(*[
+                regenerate_stage(
+                    crop_name=r.crop_name,
+                    main_stage=r.main_stage,
+                    sub_stage_name=r.sub_stage_name,
+                    start_day=r.start_day or 0,
+                    end_day=r.end_day or 0,
+                    api_key=api_key,
+                    model=model,
+                    client=client,
+                )
+                for r in batch
+            ], return_exceptions=True)
 
         for row, res in zip(batch, results):
             if isinstance(res, Exception):

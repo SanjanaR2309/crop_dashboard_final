@@ -27,15 +27,15 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return a valid JSON object with exactly 6 string keys. The advisories must be concise, practical, and formatted in clear numbered lists for readability. Do NOT write long paragraphs.
+Return a valid JSON object with exactly 6 string keys. The advisories must be highly informative, practical, and structured as detailed numbered lists for readability. Keep descriptions clear, action-oriented, and direct.
 
 {{
   "susceptible_pests":    "<Comma-separated list of 2-3 major pests (with scientific names) active at this sub-stage>",
   "pest_risk_factors":    "<Comma-separated list of 2-3 climatic or field risk factors (e.g. high humidity, waterlogging)>",
-  "pest_management":      "Cultural:\\n1. <First concise practical management practice>\\n2. <Second practice>\\n\\nBiological:\\n1. <First biological control agent/predator or Neem spray formulation>\\n2. <Second agent>\\n\\nChemical:\\n1. <First specific insecticide active ingredient, dosage, and water dilution ratio>\\n2. <Second specific chemical option>",
+  "pest_management":      "Cultural:\\n1. <First detailed practical sanitation/prevention practice>\\n2. <Second detailed practice>\\n3. <Third detailed practice>\\n\\nBiological:\\n1. <First biological control agent/predator or Neem spray formulation with concentration details>\\n2. <Second biocontrol agent>\\n3. <Third biocontrol option if applicable>\\n\\nChemical:\\n1. <First modern specific insecticide active ingredient, dosage, and water dilution ratio>\\n2. <Second chemical option with dosage and safety details>\\n3. <Third chemical option>",
   "susceptible_diseases": "<Comma-separated list of 2-3 major diseases (with scientific names) at this sub-stage>",
   "disease_risk_factors": "<Comma-separated list of 2-3 climatic/soil conditions promoting disease>",
-  "disease_management":   "Cultural:\\n1. <First concise cultural preventive practice>\\n2. <Second practice>\\n\\nBiological:\\n1. <First bio-fungicide option (e.g. Trichoderma) and application method>\\n2. <Second bio-fungicide option>\\n\\nChemical:\\n1. <First specific fungicide active ingredient, dosage, and application instruction>\\n2. <Second specific chemical option>"
+  "disease_management":   "Cultural:\\n1. <First detailed cultural preventive practice or spacing adjustment>\\n2. <Second detailed practice>\\n3. <Third detailed practice>\\n\\nBiological:\\n1. <First bio-fungicide option (e.g. Trichoderma) and application method/dose>\\n2. <Second bio-fungicide option>\\n3. <Third bio-fungicide option>\\n\\nChemical:\\n1. <First modern specific fungicide active ingredient, dosage, and application instruction>\\n2. <Second chemical option with dosage and safety details>\\n3. <Third chemical option>"
 }}
 
 Ensure all recommendations are highly accurate, professional, and specific to {crop_name} at this growth sub-stage in the Indian agricultural context. Keep descriptions direct, action-oriented, and highly readable.\
@@ -214,6 +214,7 @@ async def _call_gemini(
     api_key: str,
     model: str,
     max_tokens: int = 4500,
+    client: httpx.AsyncClient = None,
 ) -> dict:
     if not api_key:
         logger.warning("GEMINI_API_KEY not set — skipping LLM call")
@@ -230,13 +231,21 @@ async def _call_gemini(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        if client:
             resp = await client.post(
                 _API_URL.format(model=model, api_key=api_key),
                 json=payload,
                 headers={"content-type": "application/json"},
             )
             resp.raise_for_status()
+        else:
+            async with httpx.AsyncClient(timeout=120) as local_client:
+                resp = await local_client.post(
+                    _API_URL.format(model=model, api_key=api_key),
+                    json=payload,
+                    headers={"content-type": "application/json"},
+                )
+                resp.raise_for_status()
     except httpx.HTTPStatusError as e:
         logger.error("Gemini API %s: %s", e.response.status_code, e.response.text[:300])
         return fallback.copy()
@@ -295,6 +304,7 @@ async def regenerate_stage(
     end_day: int,
     api_key: str,
     model: str,
+    client: httpx.AsyncClient = None,
 ) -> dict:
     """Generate fresh pest/disease data for a single stage via Gemini."""
     prompt = _REGEN_PROMPT.format(
@@ -304,7 +314,7 @@ async def regenerate_stage(
         start_day=start_day,
         end_day=end_day,
     )
-    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=4500)
+    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=4500, client=client)
 
 
 async def generate_env_conditions(
@@ -357,6 +367,7 @@ async def translate_stage(
     language_code: str,
     api_key: str,
     model: str,
+    client: httpx.AsyncClient = None,
 ) -> dict:
     """Translate a single stage's advisory text into the target language with high accuracy."""
     lang_name = _KN_LANGUAGE_NAMES.get(language_code, language_code)
@@ -372,7 +383,7 @@ async def translate_stage(
         disease_text=disease_text or "N/A",
         env_text=env_text or "N/A",
     )
-    return await _call_gemini(prompt, _TRANSLATE_FALLBACK, api_key, model, max_tokens=4500)
+    return await _call_gemini(prompt, _TRANSLATE_FALLBACK, api_key, model, max_tokens=4500, client=client)
 
 
 # ── New Crop Stages Template Discovery ───────────────────────────────────────
@@ -404,6 +415,7 @@ async def generate_crop_stages_template(
     crop_name: str,
     api_key: str,
     model: str,
+    client: httpx.AsyncClient = None,
 ) -> list[dict]:
     """Generate a template list of growth phases and sub-stages for a new crop."""
     if not api_key:
@@ -423,13 +435,21 @@ async def generate_crop_stages_template(
 
     raw = ""
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        if client:
             resp = await client.post(
                 _API_URL.format(model=model, api_key=api_key),
                 json=payload,
                 headers={"content-type": "application/json"},
             )
             resp.raise_for_status()
+        else:
+            async with httpx.AsyncClient(timeout=60) as local_client:
+                resp = await local_client.post(
+                    _API_URL.format(model=model, api_key=api_key),
+                    json=payload,
+                    headers={"content-type": "application/json"},
+                )
+                resp.raise_for_status()
 
         raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
 

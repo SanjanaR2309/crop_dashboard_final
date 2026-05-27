@@ -156,23 +156,28 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
     api_key = os.getenv("GEMINI_API_KEY", "")
     model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-    stages = await generate_crop_stages_template(crop_name=crop_name, api_key=api_key, model=model)
-    if not stages:
-        raise HTTPException(status_code=502, detail="Failed to discover growth stages for this crop")
+    import httpx
 
-    # 3. Call regenerate_stage concurrently for all stages (paid API tier — no rate-limit sleep needed)
-    stages_knowledge = await asyncio.gather(*[
-        regenerate_stage(
-            crop_name=crop_name,
-            main_stage=s["main_stage"],
-            sub_stage_name=s["sub_stage_name"],
-            start_day=s["start_day"],
-            end_day=s["end_day"],
-            api_key=api_key,
-            model=model,
-        )
-        for s in stages
-    ])
+    # Reuse a single AsyncClient context manager to pool TCP/SSL connections across all concurrent calls
+    async with httpx.AsyncClient(timeout=120) as client:
+        stages = await generate_crop_stages_template(crop_name=crop_name, api_key=api_key, model=model, client=client)
+        if not stages:
+            raise HTTPException(status_code=502, detail="Failed to discover growth stages for this crop")
+
+        # 3. Call regenerate_stage concurrently for all stages (paid API tier — no rate-limit sleep needed)
+        stages_knowledge = await asyncio.gather(*[
+            regenerate_stage(
+                crop_name=crop_name,
+                main_stage=s["main_stage"],
+                sub_stage_name=s["sub_stage_name"],
+                start_day=s["start_day"],
+                end_day=s["end_day"],
+                api_key=api_key,
+                model=model,
+                client=client,
+            )
+            for s in stages
+        ])
 
     # 4. Map results and prepare database rows
     rows_to_insert = []
