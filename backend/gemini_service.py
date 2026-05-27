@@ -27,18 +27,18 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return a valid JSON object with exactly 6 string keys. Every field must contain highly detailed, fully descriptive, and comprehensive agronomic details. Do NOT summarize or use short phrases. Provide in-depth, expert-level explanations.
+Return a valid JSON object with exactly 6 string keys. The advisories must be concise, practical, and formatted in clear numbered lists for readability. Do NOT write long paragraphs.
 
 {{
-  "susceptible_pests":    "<Comprehensive, comma-separated list of major pests, including their scientific names, that are active and destructive at this exact sub-stage>",
-  "pest_risk_factors":    "<Detailed, descriptive list of agronomic, weather, and soil conditions (e.g. specific temp range, humidity levels, waterlogging, or sowing delays) that trigger high pest pressure>",
-  "pest_management":      "Cultural: <3-4 precise, highly detailed, step-by-step practical field sanitation or preventive practices. Explain exactly how and when to perform each>. Biological: <2-3 highly specific biological control agents, natural predators, parasitoids, or botanical sprays (e.g. exact concentration of Neem Oil or Bacillus thuringiensis) with clear application guidelines>. Chemical: <2-3 modern, specific chemical insecticide recommendations including the exact chemical name, active ingredient formulation, dosage (e.g., g/acre or ml/litre of water), and safety/application method instructions>.",
-  "susceptible_diseases": "<Comprehensive, comma-separated list of major fungal, bacterial, or viral diseases, including their scientific names, affecting the crop at this exact sub-stage>",
-  "disease_risk_factors": "<Detailed, descriptive explanation of climatic and soil factors (e.g. ambient humidity, temperature windows, continuous dampness, poor drainage) that favor pathogen multiplication>",
-  "disease_management":   "Cultural: <3-4 precise, highly detailed, step-by-step crop-protection cultural practices, crop rotation, or spacing adjustments. Explain exactly how and when to perform each>. Biological: <2-3 highly specific bio-fungicides or biocontrol options (e.g. Trichoderma harzianum or Pseudomonas fluorescens) with exact preparation and soil/foliar application details>. Chemical: <2-3 modern, highly effective chemical fungicide recommendations including the exact chemical/active ingredient formulation, dosage (e.g., g/acre or ml/litre), and specific spraying/drenching intervals>."
+  "susceptible_pests":    "<Comma-separated list of 2-3 major pests (with scientific names) active at this sub-stage>",
+  "pest_risk_factors":    "<Comma-separated list of 2-3 climatic or field risk factors (e.g. high humidity, waterlogging)>",
+  "pest_management":      "Cultural:\\n1. <First concise practical management practice>\\n2. <Second practice>\\n\\nBiological:\\n1. <First biological control agent/predator or Neem spray formulation>\\n2. <Second agent>\\n\\nChemical:\\n1. <First specific insecticide active ingredient, dosage, and water dilution ratio>\\n2. <Second specific chemical option>",
+  "susceptible_diseases": "<Comma-separated list of 2-3 major diseases (with scientific names) at this sub-stage>",
+  "disease_risk_factors": "<Comma-separated list of 2-3 climatic/soil conditions promoting disease>",
+  "disease_management":   "Cultural:\\n1. <First concise cultural preventive practice>\\n2. <Second practice>\\n\\nBiological:\\n1. <First bio-fungicide option (e.g. Trichoderma) and application method>\\n2. <Second bio-fungicide option>\\n\\nChemical:\\n1. <First specific fungicide active ingredient, dosage, and application instruction>\\n2. <Second specific chemical option>"
 }}
 
-Provide expert, actionable, and highly professional advice. Ensure the language is clear and that all chemical dosages and active ingredients are accurate and specific to the Indian agricultural context. Generate extremely rich and detailed responses.\
+Ensure all recommendations are highly accurate, professional, and specific to {crop_name} at this growth sub-stage in the Indian agricultural context. Keep descriptions direct, action-oriented, and highly readable.\
 """
 
 _REGEN_FALLBACK = {
