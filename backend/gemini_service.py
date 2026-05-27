@@ -27,18 +27,18 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return a valid JSON object with exactly 6 string keys. Keep each value informative and specific.
+Return a valid JSON object with exactly 6 string keys. Every field must contain highly detailed, fully descriptive, and comprehensive agronomic details. Do NOT summarize or use short phrases. Provide in-depth, expert-level explanations.
 
 {{
-  "susceptible_pests":    "<comma-separated list of major pests at this sub-stage>",
-  "pest_risk_factors":    "<comma-separated agronomic and climatic conditions that increase pest risk>",
-  "pest_management":      "Cultural: <2-3 practical field management practices>. Biological: <1-2 biocontrol agents or natural enemies>. Chemical: <specific chemical name, concentration and application method>.",
-  "susceptible_diseases": "<comma-separated list of major diseases at this sub-stage>",
-  "disease_risk_factors": "<comma-separated conditions that promote disease>",
-  "disease_management":   "Cultural: <2-3 practical field management practices>. Biological: <1-2 biocontrol options>. Chemical: <specific chemical name, concentration and application method>."
+  "susceptible_pests":    "<Comprehensive, comma-separated list of major pests, including their scientific names, that are active and destructive at this exact sub-stage>",
+  "pest_risk_factors":    "<Detailed, descriptive list of agronomic, weather, and soil conditions (e.g. specific temp range, humidity levels, waterlogging, or sowing delays) that trigger high pest pressure>",
+  "pest_management":      "Cultural: <3-4 precise, highly detailed, step-by-step practical field sanitation or preventive practices. Explain exactly how and when to perform each>. Biological: <2-3 highly specific biological control agents, natural predators, parasitoids, or botanical sprays (e.g. exact concentration of Neem Oil or Bacillus thuringiensis) with clear application guidelines>. Chemical: <2-3 modern, specific chemical insecticide recommendations including the exact chemical name, active ingredient formulation, dosage (e.g., g/acre or ml/litre of water), and safety/application method instructions>.",
+  "susceptible_diseases": "<Comprehensive, comma-separated list of major fungal, bacterial, or viral diseases, including their scientific names, affecting the crop at this exact sub-stage>",
+  "disease_risk_factors": "<Detailed, descriptive explanation of climatic and soil factors (e.g. ambient humidity, temperature windows, continuous dampness, poor drainage) that favor pathogen multiplication>",
+  "disease_management":   "Cultural: <3-4 precise, highly detailed, step-by-step crop-protection cultural practices, crop rotation, or spacing adjustments. Explain exactly how and when to perform each>. Biological: <2-3 highly specific bio-fungicides or biocontrol options (e.g. Trichoderma harzianum or Pseudomonas fluorescens) with exact preparation and soil/foliar application details>. Chemical: <2-3 modern, highly effective chemical fungicide recommendations including the exact chemical/active ingredient formulation, dosage (e.g., g/acre or ml/litre), and specific spraying/drenching intervals>."
 }}
 
-Be specific to {crop_name} at this exact sub-stage. Use Indian crop-protection context.\
+Provide expert, actionable, and highly professional advice. Ensure the language is clear and that all chemical dosages and active ingredients are accurate and specific to the Indian agricultural context. Generate extremely rich and detailed responses.\
 """
 
 _REGEN_FALLBACK = {
@@ -202,7 +202,7 @@ async def _call_gemini(
     fallback: dict,
     api_key: str,
     model: str,
-    max_tokens: int = 2048,
+    max_tokens: int = 4500,
 ) -> dict:
     if not api_key:
         logger.warning("GEMINI_API_KEY not set — skipping LLM call")
@@ -293,7 +293,7 @@ async def regenerate_stage(
         start_day=start_day,
         end_day=end_day,
     )
-    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=2048)
+    return await _call_gemini(prompt, _REGEN_FALLBACK, api_key, model, max_tokens=4500)
 
 
 async def generate_env_conditions(
@@ -398,7 +398,7 @@ async def translate_stage(
         disease_text=disease_text or "N/A",
         env_text=env_text or "N/A",
     )
-    return await _call_gemini(prompt, _TRANSLATE_FALLBACK, api_key, model, max_tokens=3000)
+    return await _call_gemini(prompt, _TRANSLATE_FALLBACK, api_key, model, max_tokens=4500)
 
 
 # ── New Crop Stages Template Discovery ───────────────────────────────────────
@@ -441,7 +441,7 @@ async def generate_crop_stages_template(
         "system_instruction": {"parts": [{"text": _SYSTEM}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": 4500,
             "temperature": 0.2,
             "responseMimeType": "application/json",
         },
