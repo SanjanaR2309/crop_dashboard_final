@@ -673,7 +673,7 @@ export default function ReportsArchivePage() {
                                         >
                                           <div>
                                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                                              🌱 {stage.sub_stage_name}
+                                              {stage.sub_stage_name}
                                             </div>
                                             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
                                               Day {stage.start_day}–{stage.end_day}

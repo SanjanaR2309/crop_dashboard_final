@@ -57,27 +57,38 @@ Crop      : {crop_name}
 Phase     : {main_stage}
 Sub-stage : {sub_stage_name}  (day {start_day}–{end_day} after sowing)
 
-Return ONLY a valid JSON object with exactly one key "env_conditions" containing an object with these 11 fields.
-Values should be specific to {crop_name} at this exact growth sub-stage in India.
+Return ONLY a valid flat JSON object with exactly these 11 fields (do NOT nest them under any outer key like "env_conditions"):
 
 {{
-  "env_conditions": {{
-    "uv_index":          "<e.g. Moderate to High (5-9)>",
-    "temp_max_c":        "<number, e.g. 35>",
-    "temp_min_c":        "<number, e.g. 20>",
-    "photoperiod":       "<e.g. 12-14 hours>",
-    "soil_temp_c":       "<range, e.g. 22-30>",
-    "irrigation_mm":     "<per-week range, e.g. 25-50>",
-    "optimal_temp_c":    "<range, e.g. 25-32>",
-    "avg_yield_kg_ha":   "<expected yield at harvest or 0 if pre-harvest stage>",
-    "rel_humidity_pct":  "<range, e.g. 60-80>",
-    "harvest_index_pct": "<0 to 100 depending on stage>",
-    "soil_moisture_pct": "<description or range, e.g. 25-35%>"
-  }}
-}}\
+  "uv_index":          "<e.g. Moderate to High (5-9)>",
+  "temp_max_c":        "<number, e.g. 35>",
+  "temp_min_c":        "<number, e.g. 20>",
+  "photoperiod":       "<e.g. 12-14 hours>",
+  "soil_temp_c":       "<range, e.g. 22-30>",
+  "irrigation_mm":     "<per-week range, e.g. 25-50>",
+  "optimal_temp_c":    "<range, e.g. 25-32>",
+  "avg_yield_kg_ha":   "<expected yield at harvest or 0 if pre-harvest stage>",
+  "rel_humidity_pct":  "<range, e.g. 60-80>",
+  "harvest_index_pct": "<0 to 100 depending on stage>",
+  "soil_moisture_pct": "<description or range, e.g. 25-35%>"
+}}
+
+Values must be highly accurate and specific to {crop_name} at this exact growth sub-stage in the Indian agricultural context.\
 """
 
-_ENV_FALLBACK = {"env_conditions": None}
+_ENV_KEYS_FALLBACK = {
+    "uv_index":          None,
+    "temp_max_c":        None,
+    "temp_min_c":        None,
+    "photoperiod":       None,
+    "soil_temp_c":       None,
+    "irrigation_mm":     None,
+    "optimal_temp_c":    None,
+    "avg_yield_kg_ha":   None,
+    "rel_humidity_pct":  None,
+    "harvest_index_pct": None,
+    "soil_moisture_pct": None,
+}
 
 # ── Enhanced Kannada translation prompt ──────────────────────────────────────
 # Does NOT touch llmService.py — lives only in this file.
@@ -318,58 +329,21 @@ async def generate_env_conditions(
         start_day=start_day,
         end_day=end_day,
     )
-    payload = {
-        "system_instruction": {"parts": [{"text": _SYSTEM}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 1024,
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-        },
-    }
+    
+    # Use the robust shared Gemini utility that has JSON healing and auto-repair heuristics
+    env = await _call_gemini(
+        prompt=prompt,
+        fallback=_ENV_KEYS_FALLBACK,
+        api_key=api_key,
+        model=model,
+        max_tokens=4500,
+    )
 
-    raw = ""
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                _API_URL.format(model=model, api_key=api_key),
-                json=payload,
-                headers={"content-type": "application/json"},
-            )
-            resp.raise_for_status()
-
-        body = resp.json()
-        candidate = body.get("candidates", [{}])[0]
-
-        # Guard: Gemini may omit 'content' when finishReason is SAFETY/OTHER
-        if "content" not in candidate:
-            finish = candidate.get("finishReason", "UNKNOWN")
-            logger.error("Gemini env: no content in response, finishReason=%s", finish)
-            return None
-
-        raw = candidate["content"]["parts"][0]["text"].strip()
-
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            parts = raw.split("```")
-            raw = parts[1] if len(parts) > 1 else raw
-            if raw.startswith("json"):
-                raw = raw[4:].strip()
-
-        data = json.loads(raw)
-
-        # Handle both {"env_conditions": {...}} and direct {...} response formats
-        env = data.get("env_conditions", data)
-        if isinstance(env, dict) and env:
-            return env
+    # Return None if generation failed completely (all keys returned as fallback/None)
+    if all(v is None for v in env.values()):
         return None
 
-    except httpx.HTTPStatusError as e:
-        logger.error("Gemini env API %s: %s", e.response.status_code, e.response.text[:200])
-        return None
-    except Exception as e:
-        logger.error("Failed to generate env conditions: %s | raw[:200]=%s", e, raw[:200])
-        return None
+    return env
 
 
 async def translate_stage(

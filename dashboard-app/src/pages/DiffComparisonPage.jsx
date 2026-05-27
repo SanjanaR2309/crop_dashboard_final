@@ -39,7 +39,7 @@ function DiffField({ fieldKey, label, original, regenerated, editedValues, onEdi
               style={{ background: 'transparent', width: '100%' }}
             />
           </div>
-          {isEdited && <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>✏️ Manually edited</div>}
+          {isEdited && <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Manually edited</div>}
         </div>
       </div>
     </div>
@@ -95,7 +95,7 @@ function ManagementDiffField({ fieldKey, label, original, regenerated, editedVal
                       style={{ background: 'transparent', width: '100%', minHeight: '80px' }}
                     />
                   </div>
-                  {isEditedVal && <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>✏️ Manually edited</div>}
+                  {isEditedVal && <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Manually edited</div>}
                 </div>
               </div>
             </div>

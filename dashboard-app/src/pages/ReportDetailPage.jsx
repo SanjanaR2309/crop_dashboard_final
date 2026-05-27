@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import Navbar from '../components/Navbar'
-import { fetchReportByUid, fetchTranslation, regenerateReport, generateEnvConditions, saveReport } from '../api/cropApi'
+import { fetchReportByUid, regenerateReport, generateEnvConditions, saveReport } from '../api/cropApi'
 
 function formatDate(ts) {
   try { return format(new Date(ts), 'MMM dd, yyyy') } catch { return ts || '' }
@@ -112,7 +112,7 @@ function ManagementFieldBlock({ label, value, fieldKey, editedFields, onChange, 
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{subLabel}</span>
                 {isEdited && (
                   <span style={{ fontSize: 9, color: '#b45309', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 2 }}>
-                    ✏️ Edited
+                    Edited
                   </span>
                 )}
               </div>
@@ -161,7 +161,7 @@ function EditableFieldBlock({ label, value, fieldKey, editedFields, onChange, is
         <span>{label}</span>
         {isEdited && (
           <span style={{ fontSize: 10, color: '#b45309', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 3 }}>
-            ✏️ Edited
+            Edited
           </span>
         )}
       </div>
@@ -199,9 +199,6 @@ function EditableFieldBlock({ label, value, fieldKey, editedFields, onChange, is
 export default function ReportDetailPage() {
   const { uid } = useParams()
   const navigate = useNavigate()
-  const [report, setReport] = useState(null)
-  const [translation, setTranslation] = useState(null)
-  const [lang, setLang] = useState('en')
   const [isEditing, setIsEditing] = useState(false)
   
   // Save & edit states
@@ -231,23 +228,7 @@ export default function ReportDetailPage() {
 
   const isVerified = verifiedUids.includes(uid)
 
-  useEffect(() => {
-    setLoading(true)
-    fetchReportByUid(uid)
-      .then(setReport)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [uid])
-
-  const handleLangToggle = async (l) => {
-    setLang(l)
-    if (l === 'kn' && !translation) {
-      try {
-        const t = await fetchTranslation(uid, 'kn')
-        setTranslation(t)
-      } catch { setTranslation(null) }
-    }
-  }
+  const [report, setReport] = useState(null)
 
   const handleFieldChange = (key, value) => {
     setEditedFields(prev => ({ ...prev, [key]: value }))
@@ -340,7 +321,14 @@ export default function ReportDetailPage() {
     }
   }
 
-  const displayKn = lang === 'kn' && translation
+  useEffect(() => {
+    setLoading(true)
+    fetchReportByUid(uid)
+      .then(setReport)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [uid])
+
   const envParsed = report?.env_conditions
     ? (typeof report.env_conditions === 'string' ? JSON.parse(report.env_conditions) : report.env_conditions)
     : null
@@ -361,14 +349,8 @@ export default function ReportDetailPage() {
           </div>
           
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-            {/* Language Selector */}
-            <div className="lang-toggle">
-              <button className={lang === 'en' ? 'active' : ''} onClick={() => handleLangToggle('en')}>EN</button>
-              <button className={lang === 'kn' ? 'active' : ''} onClick={() => handleLangToggle('kn')}>ಕನ್ನಡ</button>
-            </div>
-
             {/* English Actions */}
-            {lang === 'en' && report && (
+            {report && (
               isEditing ? (
                 <>
                   <button className="btn btn-outline" onClick={handleCancel}>
@@ -479,40 +461,6 @@ export default function ReportDetailPage() {
                 </>
               )
             )}
-
-            {/* Kannada Actions */}
-            {lang === 'kn' && report && (
-              <button
-                className="btn btn-primary"
-                onClick={handleRegenerate}
-                disabled={regen || loading}
-                style={{
-                  minWidth: 120,
-                  justifyContent: 'center',
-                  backgroundColor: '#1354ec',
-                  borderColor: '#1354ec',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 4px rgba(19, 84, 236, 0.15)',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseOver={(e) => {
-                  if (!regen && !loading) {
-                    e.currentTarget.style.backgroundColor = '#0e43c4';
-                    e.currentTarget.style.borderColor = '#0e43c4';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1354ec';
-                  e.currentTarget.style.borderColor = '#1354ec';
-                }}
-              >
-                {regen
-                  ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.2)' }} />&nbsp;Regenerating…</>
-                  : <><span className="material-symbols-outlined" style={{ fontSize: 17 }}>refresh</span>&nbsp;Regenerate</>
-                }
-              </button>
-            )}
           </div>
         </div>
 
@@ -570,9 +518,7 @@ export default function ReportDetailPage() {
             <div className="report-detail-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
                 <h1 className="report-detail-title" style={{ fontSize: 36, fontWeight: 700, margin: 0 }}>
-                  {displayKn ? (translation.crop_name_local || report.crop_name) : report.crop_name}
-                  {' — '}
-                  {displayKn ? (translation.stage_name_local || report.sub_stage_name) : report.sub_stage_name}
+                  {report.crop_name} — {report.sub_stage_name}
                 </h1>
                 
                 {/* Manual Verification Badge at top */}
@@ -587,7 +533,7 @@ export default function ReportDetailPage() {
                 <span>·</span>
                 <span>{formatDate(report.updated_at)}</span>
                 <span>·</span>
-                <span>PHASE: {displayKn ? (translation?.phase_name_local || report.main_stage) : report.main_stage}</span>
+                <span>PHASE: {report.main_stage}</span>
                 <span>·</span>
                 <span>DAY {report.start_day}–{report.end_day}</span>
               </div>
@@ -598,38 +544,32 @@ export default function ReportDetailPage() {
             {/* ── Pest Section ───────────────────────────────────────────────── */}
             <section className="report-section">
               <h2 className="report-section-title" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>
-                🪲 Pest Information
+                Pest Information
               </h2>
-              {displayKn ? (
-                <div className="report-field-value" style={{ fontSize: 16, lineHeight: 1.9 }}>{translation.pest_data_local || 'No Kannada translation available.'}</div>
-              ) : (
-                <>
-                  <EditableFieldBlock
-                    label="Susceptible Pests"
-                    value={report.susceptible_pests}
-                    fieldKey="susceptible_pests"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                  <EditableFieldBlock
-                    label="Pest Risk Factors"
-                    value={report.pest_risk_factors}
-                    fieldKey="pest_risk_factors"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                  <ManagementFieldBlock
-                    label="Pest Management"
-                    value={report.pest_management}
-                    fieldKey="pest_management"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                </>
-              )}
+              <EditableFieldBlock
+                label="Susceptible Pests"
+                value={report.susceptible_pests}
+                fieldKey="susceptible_pests"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
+              <EditableFieldBlock
+                label="Pest Risk Factors"
+                value={report.pest_risk_factors}
+                fieldKey="pest_risk_factors"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
+              <ManagementFieldBlock
+                label="Pest Management"
+                value={report.pest_management}
+                fieldKey="pest_management"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
             </section>
 
             <hr className="divider" />
@@ -637,38 +577,32 @@ export default function ReportDetailPage() {
             {/* ── Disease Section ─────────────────────────────────────────────── */}
             <section className="report-section">
               <h2 className="report-section-title" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>
-                🌿 Disease Information
+                Disease Information
               </h2>
-              {displayKn ? (
-                <div className="report-field-value" style={{ fontSize: 16, lineHeight: 1.9 }}>{translation.disease_data_local || 'No Kannada translation available.'}</div>
-              ) : (
-                <>
-                  <EditableFieldBlock
-                    label="Susceptible Diseases"
-                    value={report.susceptible_diseases}
-                    fieldKey="susceptible_diseases"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                  <EditableFieldBlock
-                    label="Disease Risk Factors"
-                    value={report.disease_risk_factors}
-                    fieldKey="disease_risk_factors"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                  <ManagementFieldBlock
-                    label="Disease Management"
-                    value={report.disease_management}
-                    fieldKey="disease_management"
-                    editedFields={editedFields}
-                    onChange={handleFieldChange}
-                    isEditing={isEditing}
-                  />
-                </>
-              )}
+              <EditableFieldBlock
+                label="Susceptible Diseases"
+                value={report.susceptible_diseases}
+                fieldKey="susceptible_diseases"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
+              <EditableFieldBlock
+                label="Disease Risk Factors"
+                value={report.disease_risk_factors}
+                fieldKey="disease_risk_factors"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
+              <ManagementFieldBlock
+                label="Disease Management"
+                value={report.disease_management}
+                fieldKey="disease_management"
+                editedFields={editedFields}
+                onChange={handleFieldChange}
+                isEditing={isEditing}
+              />
             </section>
 
             {/* ── Environmental Conditions ────────────────────────────────────── */}
@@ -677,13 +611,9 @@ export default function ReportDetailPage() {
                 <hr className="divider" />
                 <section className="report-section">
                   <h2 className="report-section-title" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>
-                    🌡️ Environmental Conditions
+                    Environmental Conditions
                   </h2>
-                  {displayKn && translation?.env_data_local ? (
-                    <div className="report-field-value" style={{ fontSize: 16, lineHeight: 1.9 }}>{translation.env_data_local}</div>
-                  ) : (
-                    <EnvBlock env={envParsed} />
-                  )}
+                  <EnvBlock env={envParsed} />
                 </section>
               </>
             )}
