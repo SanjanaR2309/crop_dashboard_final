@@ -164,9 +164,10 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
 
     # Reuse a single AsyncClient context manager to pool TCP/SSL connections across all concurrent calls
     async with httpx.AsyncClient(timeout=120) as client:
-        stages = await generate_crop_stages_template(crop_name=crop_name, api_key=api_key, model=model, client=client)
+        stages, stages_error = await generate_crop_stages_template(crop_name=crop_name, api_key=api_key, model=model, client=client)
         if not stages:
-            raise HTTPException(status_code=502, detail="Failed to discover growth stages for this crop")
+            detail = f"Failed to discover growth stages: {stages_error}" if stages_error else "Failed to discover growth stages for this crop"
+            raise HTTPException(status_code=502, detail=detail)
 
         # 3. Call regenerate_stage AND generate_env_conditions concurrently for ALL stages at once.
         #    Each stage spawns two Gemini calls in parallel: pest/disease regen + env conditions.

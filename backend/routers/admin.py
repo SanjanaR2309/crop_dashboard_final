@@ -54,6 +54,28 @@ async def test_regen():
     }
 
 
+@router.get("/admin/test-stages")
+async def test_stages_generation(crop_name: str = "apple"):
+    """Test generate_crop_stages_template directly — returns stages or detailed error reason."""
+    from gemini_service import generate_crop_stages_template
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    stages, error = await generate_crop_stages_template(
+        crop_name=crop_name,
+        api_key=api_key,
+        model=model,
+    )
+    return {
+        "crop_name": crop_name,
+        "api_key_set": bool(api_key),
+        "model": model,
+        "stages_count": len(stages),
+        "stages": stages,
+        "error": error,
+        "success": error is None and len(stages) > 0,
+    }
+
+
 @router.post("/admin/regen-empty")
 async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
     """

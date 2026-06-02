@@ -416,11 +416,14 @@ async def generate_crop_stages_template(
     api_key: str,
     model: str,
     client: httpx.AsyncClient = None,
-) -> list[dict]:
-    """Generate a template list of growth phases and sub-stages for a new crop."""
+) -> tuple[list[dict], str | None]:
+    """Generate a template list of growth phases/sub-stages for a new crop.
+    Returns (stages_list, error_detail). If error_detail is set, stages_list will be [].
+    """
     if not api_key:
-        logger.warning("GEMINI_API_KEY not set — skipping stages template call")
-        return []
+        msg = "GEMINI_API_KEY not set on server"
+        logger.warning(msg)
+        return [], msg
 
     prompt = _STAGES_TEMPLATE_PROMPT.format(crop_name=crop_name)
     payload = {
@@ -441,17 +444,40 @@ async def generate_crop_stages_template(
                 json=payload,
                 headers={"content-type": "application/json"},
             )
-            resp.raise_for_status()
         else:
-            async with httpx.AsyncClient(timeout=60) as local_client:
+            async with httpx.AsyncClient(timeout=90) as local_client:
                 resp = await local_client.post(
                     _API_URL.format(model=model, api_key=api_key),
                     json=payload,
                     headers={"content-type": "application/json"},
                 )
-                resp.raise_for_status()
 
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        # Surface HTTP errors (429 rate limit, 400 bad request, etc.) clearly
+        if resp.status_code != 200:
+            msg = f"Gemini API returned HTTP {resp.status_code}: {resp.text[:300]}"
+            logger.error("Gemini stages error: %s", msg)
+            return [], msg
+
+        body = resp.json()
+        candidates = body.get("candidates", [])
+        if not candidates:
+            # Could be a prompt feedback block
+            feedback = body.get("promptFeedback", {})
+            block_reason = feedback.get("blockReason", "unknown")
+            msg = f"Gemini returned no candidates (blockReason: {block_reason})"
+            logger.error(msg)
+            return [], msg
+
+        candidate = candidates[0]
+        # Check for safety/recitation finish reasons with no content
+        finish_reason = candidate.get("finishReason", "")
+        content = candidate.get("content")
+        if not content:
+            msg = f"Gemini candidate has no content (finishReason: {finish_reason})"
+            logger.error(msg)
+            return [], msg
+
+        raw = content["parts"][0]["text"].strip()
 
         # Strip markdown fences
         if raw.startswith("```"):
@@ -460,17 +486,34 @@ async def generate_crop_stages_template(
             if raw.startswith("json"):
                 raw = raw[4:].strip()
 
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            try:
+                data = json.loads(raw, strict=False)
+            except json.JSONDecodeError as e:
+                msg = f"JSON parse error: {e} | raw[:300]={raw[:300]}"
+                logger.error("Stages template parse failed: %s", msg)
+                return [], msg
+
         stages = data.get("stages", [])
-        return stages if isinstance(stages, list) else []
+        if not isinstance(stages, list) or len(stages) == 0:
+            msg = f"Gemini returned empty or invalid stages list. Keys in response: {list(data.keys())}"
+            logger.error(msg)
+            return [], msg
+
+        return stages, None
 
     except httpx.HTTPStatusError as e:
-        logger.error("Gemini stages API %s: %s", e.response.status_code, e.response.text[:300])
-        return []
+        msg = f"Gemini API HTTP {e.response.status_code}: {e.response.text[:300]}"
+        logger.error("Gemini stages HTTPStatusError: %s", msg)
+        return [], msg
     except httpx.RequestError as e:
-        logger.error("Gemini stages request failed: %s", e)
-        return []
-    except (KeyError, IndexError, json.JSONDecodeError) as e:
-        logger.error("Failed to parse stages template response: %s | raw[:200]=%s", e, raw[:200])
-        return []
+        msg = f"Gemini network error: {str(e)}"
+        logger.error("Gemini stages RequestError: %s", msg)
+        return [], msg
+    except Exception as e:
+        msg = f"Unexpected error calling Gemini: {str(e)}"
+        logger.error("Gemini stages unexpected error: %s", msg)
+        return [], msg
 
