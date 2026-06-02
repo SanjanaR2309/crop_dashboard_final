@@ -791,10 +791,10 @@ export default function ReportsArchivePage() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', textAlign: 'center' }}>
                 <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3, borderTopColor: '#000', borderRadius: '50%', borderStyle: 'solid', animation: 'spin 1s linear infinite' }} />
                 <div style={{ marginTop: 18, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Synthesizing growth timeline...
+                  Synthesizing complete crop advisory...
                 </div>
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Analyzing "{newCropName}" agronomy & generating pest advisories. This takes ~12 seconds.
+                  Generating pest, disease & environmental data for all growth stages of "{newCropName}". This takes ~30–60 seconds.
                 </div>
               </div>
             ) : (

@@ -157,6 +157,10 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
     model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     import httpx
+    import logging
+    from gemini_service import generate_env_conditions as gen_env
+
+    logger = logging.getLogger(__name__)
 
     # Reuse a single AsyncClient context manager to pool TCP/SSL connections across all concurrent calls
     async with httpx.AsyncClient(timeout=120) as client:
@@ -164,9 +168,22 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
         if not stages:
             raise HTTPException(status_code=502, detail="Failed to discover growth stages for this crop")
 
-        # 3. Call regenerate_stage concurrently for all stages (paid API tier — no rate-limit sleep needed)
-        stages_knowledge = await asyncio.gather(*[
-            regenerate_stage(
+        # 3. Call regenerate_stage AND generate_env_conditions concurrently for ALL stages at once.
+        #    Each stage spawns two Gemini calls in parallel: pest/disease regen + env conditions.
+        async def fetch_with_retry(func, retries=2, **kwargs):
+            for attempt in range(retries + 1):
+                try:
+                    return await func(**kwargs)
+                except Exception as e:
+                    if attempt == retries:
+                        logger.error("Function failed after %d retries: %s", retries, e)
+                        return None
+                    await asyncio.sleep(1)
+
+        async def fetch_stage_data(s):
+            """Fetch both pest/disease data and env conditions for one stage. Returns (knowledge, env)."""
+            knowledge = await fetch_with_retry(
+                regenerate_stage,
                 crop_name=crop_name,
                 main_stage=s["main_stage"],
                 sub_stage_name=s["sub_stage_name"],
@@ -176,13 +193,24 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
                 model=model,
                 client=client,
             )
-            for s in stages
-        ])
+            env = await fetch_with_retry(
+                gen_env,
+                crop_name=crop_name,
+                main_stage=s["main_stage"],
+                sub_stage_name=s["sub_stage_name"],
+                start_day=s["start_day"],
+                end_day=s["end_day"],
+                api_key=api_key,
+                model=model,
+            )
+            return knowledge or {}, env
+
+        results = await asyncio.gather(*[fetch_stage_data(s) for s in stages])
 
     # 4. Map results and prepare database rows
     rows_to_insert = []
     for i, s in enumerate(stages):
-        knowledge = stages_knowledge[i]
+        knowledge, env = results[i]
         
         # Clean/fallback fields
         row = {
@@ -198,7 +226,7 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
             "susceptible_diseases": knowledge.get("susceptible_diseases") or "",
             "disease_risk_factors": knowledge.get("disease_risk_factors") or "",
             "disease_management": knowledge.get("disease_management") or "",
-            "env_conditions": knowledge.get("env_conditions"),
+            "env_conditions": env,
         }
         rows_to_insert.append(row)
 
