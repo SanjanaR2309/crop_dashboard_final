@@ -1,6 +1,7 @@
 """
 Router: /api/admin
-Admin overview — crop index and translation health
+Admin overview — crop index and translation health.
+All mutating endpoints require X-Admin-Key header.
 Only touches: crop_stage_knowledge, crop_stage_translations
 """
 import os
@@ -12,9 +13,12 @@ from sqlalchemy import text
 from database import get_db
 import queries
 from gemini_service import regenerate_stage
+from auth import require_admin_key
 
 router = APIRouter()
 
+
+# ── Read-only admin endpoints (no auth required) ──────────────────────────────
 
 @router.get("/admin/crops")
 async def get_crops(db: AsyncSession = Depends(get_db)):
@@ -26,57 +30,15 @@ async def get_translation_status(db: AsyncSession = Depends(get_db)):
     return await queries.get_translation_status(db)
 
 
-@router.delete("/admin/crops/{crop_name}")
+# ── Mutating admin endpoints (admin key required) ─────────────────────────────
+
+@router.delete("/admin/crops/{crop_name}", dependencies=[Depends(require_admin_key)])
 async def delete_crop(crop_name: str, db: AsyncSession = Depends(get_db)):
     await queries.delete_crop(db, crop_name)
     return {"success": True, "message": f"Successfully deleted crop '{crop_name}' and all associated growth stages."}
 
 
-@router.get("/admin/test-regen")
-async def test_regen():
-    """Test a single regenerate_stage call — confirms Gemini is working end-to-end."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    result = await regenerate_stage(
-        crop_name="Rice",
-        main_stage="Vegetative Phase",
-        sub_stage_name="Tillering",
-        start_day=15,
-        end_day=45,
-        api_key=api_key,
-        model=model,
-    )
-    return {
-        "api_key_set": bool(api_key),
-        "model": model,
-        "result": result,
-        "fields_populated": {k: v is not None and v != "" for k, v in result.items()},
-    }
-
-
-@router.get("/admin/test-stages")
-async def test_stages_generation(crop_name: str = "apple"):
-    """Test generate_crop_stages_template directly — returns stages or detailed error reason."""
-    from gemini_service import generate_crop_stages_template
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    stages, error = await generate_crop_stages_template(
-        crop_name=crop_name,
-        api_key=api_key,
-        model=model,
-    )
-    return {
-        "crop_name": crop_name,
-        "api_key_set": bool(api_key),
-        "model": model,
-        "stages_count": len(stages),
-        "stages": stages,
-        "error": error,
-        "success": error is None and len(stages) > 0,
-    }
-
-
-@router.post("/admin/regen-empty")
+@router.post("/admin/regen-empty", dependencies=[Depends(require_admin_key)])
 async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
     """
     Finds all stages in the DB where pest_management or disease_management is NULL/empty
@@ -107,9 +69,7 @@ async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
     fixed = 0
     errors = []
 
-    # Reuse a single AsyncClient to pool connections across all batches
     async with httpx.AsyncClient(timeout=120) as client:
-        # Process in batches of 5 to avoid rate limiting
         batch_size = 5
         for i in range(0, total, batch_size):
             batch = rows[i:i + batch_size]
@@ -127,37 +87,36 @@ async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
                 for r in batch
             ], return_exceptions=True)
 
-        for row, res in zip(batch, results):
-            if isinstance(res, Exception):
-                errors.append(f"{row.crop_name}/{row.sub_stage_name}: {str(res)[:80]}")
-                continue
+            for row, res in zip(batch, results):
+                if isinstance(res, Exception):
+                    errors.append(f"{row.crop_name}/{row.sub_stage_name}: {str(res)[:80]}")
+                    continue
 
-            has_data = any(v for v in res.values() if v)
-            if not has_data:
-                errors.append(f"{row.crop_name}/{row.sub_stage_name}: Gemini returned empty")
-                continue
+                has_data = any(v for v in res.values() if v)
+                if not has_data:
+                    errors.append(f"{row.crop_name}/{row.sub_stage_name}: Gemini returned empty")
+                    continue
 
-            await db.execute(text("""
-                UPDATE crop_stage_knowledge SET
-                    susceptible_pests    = :susceptible_pests,
-                    pest_risk_factors    = :pest_risk_factors,
-                    pest_management      = :pest_management,
-                    susceptible_diseases = :susceptible_diseases,
-                    disease_risk_factors = :disease_risk_factors,
-                    disease_management   = :disease_management,
-                    data_source          = 'llm',
-                    updated_at           = now()
-                WHERE uid = :uid
-            """), {"uid": row.uid, **{k: res.get(k) or "" for k in [
-                "susceptible_pests", "pest_risk_factors", "pest_management",
-                "susceptible_diseases", "disease_risk_factors", "disease_management"
-            ]}})
-            fixed += 1
+                await db.execute(text("""
+                    UPDATE crop_stage_knowledge SET
+                        susceptible_pests    = :susceptible_pests,
+                        pest_risk_factors    = :pest_risk_factors,
+                        pest_management      = :pest_management,
+                        susceptible_diseases = :susceptible_diseases,
+                        disease_risk_factors = :disease_risk_factors,
+                        disease_management   = :disease_management,
+                        data_source          = 'llm',
+                        updated_at           = now()
+                    WHERE uid = :uid
+                """), {"uid": row.uid, **{k: res.get(k) or "" for k in [
+                    "susceptible_pests", "pest_risk_factors", "pest_management",
+                    "susceptible_diseases", "disease_risk_factors", "disease_management"
+                ]}})
+                fixed += 1
 
-        await db.commit()
-        # Small pause between batches
-        if i + batch_size < total:
-            await asyncio.sleep(0.5)
+            await db.commit()
+            if i + batch_size < total:
+                await asyncio.sleep(0.5)
 
     return {
         "total_empty_stages": total,

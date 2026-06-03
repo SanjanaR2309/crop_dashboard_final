@@ -1,5 +1,7 @@
 """
 Router: /api/stats, /api/crop-knowledge
+Read endpoints are public (dashboard UI needs them).
+All write/mutating endpoints require X-Admin-Key header.
 Only touches: crop_stage_knowledge
 """
 import os
@@ -11,19 +13,20 @@ from typing import Optional
 from database import get_db
 import queries
 from gemini_service import regenerate_stage, generate_crop_stages_template, generate_env_conditions
+from auth import require_admin_key
 import asyncio
 from uuid import uuid4
 from fastapi import HTTPException
 
 router = APIRouter()
 
-# ── Stats ─────────────────────────────────────────────────────────────────────
+# ── Stats (public) ────────────────────────────────────────────────────────────
 
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
     return await queries.get_stats(db)
 
-# ── List / Search ─────────────────────────────────────────────────────────────
+# ── List / Search (public) ────────────────────────────────────────────────────
 
 @router.get("/crop-knowledge")
 async def list_reports(
@@ -36,17 +39,16 @@ async def list_reports(
 ):
     return await queries.list_reports(db, page=page, page_size=page_size, search=search, crops=crops, sources=sources)
 
-# ── Single record ─────────────────────────────────────────────────────────────
+# ── Single record (public) ────────────────────────────────────────────────────
 
 @router.get("/crop-knowledge/{uid}")
 async def get_report(uid: str, db: AsyncSession = Depends(get_db)):
     report = await queries.get_report_by_uid(db, uid)
     if not report:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Record not found")
     return report
 
-# ── Save (accept revision) ────────────────────────────────────────────────────
+# ── Save revision (admin key required) ───────────────────────────────────────
 
 class SavePayload(BaseModel):
     susceptible_pests:    Optional[str] = None
@@ -56,18 +58,17 @@ class SavePayload(BaseModel):
     disease_risk_factors: Optional[str] = None
     disease_management:   Optional[str] = None
 
-@router.put("/crop-knowledge/{uid}")
+@router.put("/crop-knowledge/{uid}", dependencies=[Depends(require_admin_key)])
 async def save_report(uid: str, payload: SavePayload, db: AsyncSession = Depends(get_db)):
     updated = await queries.upsert_report(db, uid, payload.model_dump())
     return updated
 
-# ── Regenerate via Gemini ─────────────────────────────────────────────────────
+# ── Regenerate via Gemini (admin key required) ────────────────────────────────
 
-@router.post("/crop-knowledge/{uid}/regenerate")
+@router.post("/crop-knowledge/{uid}/regenerate", dependencies=[Depends(require_admin_key)])
 async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
     report = await queries.get_report_by_uid(db, uid)
     if not report:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Record not found")
 
     api_key = os.getenv("GEMINI_API_KEY", "")
@@ -83,12 +84,8 @@ async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
         model=model,
     )
     keys_to_fallback = [
-        "susceptible_pests",
-        "pest_risk_factors",
-        "pest_management",
-        "susceptible_diseases",
-        "disease_risk_factors",
-        "disease_management"
+        "susceptible_pests", "pest_risk_factors", "pest_management",
+        "susceptible_diseases", "disease_risk_factors", "disease_management"
     ]
     for k in keys_to_fallback:
         if not new_data.get(k):
@@ -98,9 +95,9 @@ async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
     return {**report, **new_data, "_is_regenerated": True}
 
 
-# ── Generate Env Conditions (on-demand) ─────────────────────────────────
+# ── Generate Env Conditions (admin key required) ──────────────────────────────
 
-@router.post("/crop-knowledge/{uid}/generate-env")
+@router.post("/crop-knowledge/{uid}/generate-env", dependencies=[Depends(require_admin_key)])
 async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
     report = await queries.get_report_by_uid(db, uid)
     if not report:
@@ -122,7 +119,6 @@ async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
     if not env:
         raise HTTPException(status_code=502, detail="Failed to generate environmental conditions")
 
-    # Save directly to DB
     import json
     env_json = json.dumps(env) if isinstance(env, dict) else env
     from sqlalchemy import text
@@ -133,26 +129,23 @@ async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
     """), {"uid": uid, "env": env_json})
     await db.commit()
 
-    # Return updated full report
     return await queries.get_report_by_uid(db, uid)
 
 
-# ── Add New Crop (Full Generation) ───────────────────────────────────────────
+# ── Add New Crop (admin key required) ─────────────────────────────────────────
 
 class GenerateCropPayload(BaseModel):
     crop_name: str
 
-@router.post("/crop-knowledge/generate")
+@router.post("/crop-knowledge/generate", dependencies=[Depends(require_admin_key)])
 async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = Depends(get_db)):
     crop_name = payload.crop_name.strip()
     if not crop_name:
         raise HTTPException(status_code=400, detail="Crop name cannot be empty")
 
-    # 1. Check duplicate
     if await queries.crop_exists(db, crop_name):
         raise HTTPException(status_code=400, detail=f"Crop '{crop_name}' already exists in database")
 
-    # 2. Call Gemini to discover phases and sub-stages
     api_key = os.getenv("GEMINI_API_KEY", "")
     model   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
@@ -162,15 +155,14 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
 
     logger = logging.getLogger(__name__)
 
-    # Reuse a single AsyncClient context manager to pool TCP/SSL connections across all concurrent calls
     async with httpx.AsyncClient(timeout=120) as client:
-        stages, stages_error = await generate_crop_stages_template(crop_name=crop_name, api_key=api_key, model=model, client=client)
+        stages, stages_error = await generate_crop_stages_template(
+            crop_name=crop_name, api_key=api_key, model=model, client=client
+        )
         if not stages:
             detail = f"Failed to discover growth stages: {stages_error}" if stages_error else "Failed to discover growth stages for this crop"
             raise HTTPException(status_code=502, detail=detail)
 
-        # 3. Call regenerate_stage AND generate_env_conditions concurrently for ALL stages at once.
-        #    Each stage spawns two Gemini calls in parallel: pest/disease regen + env conditions.
         async def fetch_with_retry(func, retries=2, **kwargs):
             for attempt in range(retries + 1):
                 try:
@@ -182,7 +174,7 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
                     await asyncio.sleep(1)
 
         async def fetch_stage_data(s):
-            """Fetch both pest/disease data and env conditions for one stage. Returns (knowledge, env)."""
+            """Fetch both pest/disease data and env conditions for one stage."""
             knowledge = await fetch_with_retry(
                 regenerate_stage,
                 crop_name=crop_name,
@@ -208,12 +200,9 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
 
         results = await asyncio.gather(*[fetch_stage_data(s) for s in stages])
 
-    # 4. Map results and prepare database rows
     rows_to_insert = []
     for i, s in enumerate(stages):
         knowledge, env = results[i]
-        
-        # Clean/fallback fields
         row = {
             "uid": f"csk_{uuid4()}",
             "crop_name": crop_name,
@@ -231,7 +220,6 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
         }
         rows_to_insert.append(row)
 
-    # 5. Insert rows into DB
     await queries.insert_crop_stages(db, rows_to_insert)
 
     return {
@@ -239,4 +227,3 @@ async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = 
         "stages_count": len(rows_to_insert),
         "crop_name": crop_name,
     }
-
