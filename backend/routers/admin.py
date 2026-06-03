@@ -1,7 +1,6 @@
 """
 Router: /api/admin
-Admin overview — crop index and translation health.
-All mutating endpoints require X-Admin-Key header.
+Admin overview — crop index and translation health
 Only touches: crop_stage_knowledge, crop_stage_translations
 """
 import os
@@ -13,7 +12,6 @@ from sqlalchemy import text
 from database import get_db
 import queries
 from gemini_service import regenerate_stage
-from auth import require_admin_key
 
 router = APIRouter()
 
@@ -32,13 +30,13 @@ async def get_translation_status(db: AsyncSession = Depends(get_db)):
 
 # ── Mutating admin endpoints (admin key required) ─────────────────────────────
 
-@router.delete("/admin/crops/{crop_name}", dependencies=[Depends(require_admin_key)])
+@router.delete("/admin/crops/{crop_name}")
 async def delete_crop(crop_name: str, db: AsyncSession = Depends(get_db)):
     await queries.delete_crop(db, crop_name)
     return {"success": True, "message": f"Successfully deleted crop '{crop_name}' and all associated growth stages."}
 
 
-@router.post("/admin/regen-empty", dependencies=[Depends(require_admin_key)])
+@router.post("/admin/regen-empty")
 async def regen_empty_stages(db: AsyncSession = Depends(get_db)):
     """
     Finds all stages in the DB where pest_management or disease_management is NULL/empty

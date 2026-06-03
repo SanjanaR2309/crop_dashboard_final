@@ -1,7 +1,6 @@
 """
 Router: /api/stats, /api/crop-knowledge
 Read endpoints are public (dashboard UI needs them).
-All write/mutating endpoints require X-Admin-Key header.
 Only touches: crop_stage_knowledge
 """
 import os
@@ -13,7 +12,6 @@ from typing import Optional
 from database import get_db
 import queries
 from gemini_service import regenerate_stage, generate_crop_stages_template, generate_env_conditions
-from auth import require_admin_key
 import asyncio
 from uuid import uuid4
 from fastapi import HTTPException
@@ -58,14 +56,14 @@ class SavePayload(BaseModel):
     disease_risk_factors: Optional[str] = None
     disease_management:   Optional[str] = None
 
-@router.put("/crop-knowledge/{uid}", dependencies=[Depends(require_admin_key)])
+@router.put("/crop-knowledge/{uid}")
 async def save_report(uid: str, payload: SavePayload, db: AsyncSession = Depends(get_db)):
     updated = await queries.upsert_report(db, uid, payload.model_dump())
     return updated
 
 # ── Regenerate via Gemini (admin key required) ────────────────────────────────
 
-@router.post("/crop-knowledge/{uid}/regenerate", dependencies=[Depends(require_admin_key)])
+@router.post("/crop-knowledge/{uid}/regenerate")
 async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
     report = await queries.get_report_by_uid(db, uid)
     if not report:
@@ -97,7 +95,7 @@ async def regenerate_report(uid: str, db: AsyncSession = Depends(get_db)):
 
 # ── Generate Env Conditions (admin key required) ──────────────────────────────
 
-@router.post("/crop-knowledge/{uid}/generate-env", dependencies=[Depends(require_admin_key)])
+@router.post("/crop-knowledge/{uid}/generate-env")
 async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
     report = await queries.get_report_by_uid(db, uid)
     if not report:
@@ -137,7 +135,7 @@ async def generate_env_for_stage(uid: str, db: AsyncSession = Depends(get_db)):
 class GenerateCropPayload(BaseModel):
     crop_name: str
 
-@router.post("/crop-knowledge/generate", dependencies=[Depends(require_admin_key)])
+@router.post("/crop-knowledge/generate")
 async def generate_crop_report(payload: GenerateCropPayload, db: AsyncSession = Depends(get_db)):
     crop_name = payload.crop_name.strip()
     if not crop_name:
